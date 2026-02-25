@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="pl">
+
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 350px;
+            max-height: 740px;
+            font-family: 'Inter', -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #1a1a3e 40%, #24243e 100%);
+            color: #e0e0e0;
+            overflow: hidden;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Animated background orbs */
+        body::before,
+        body::after {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::before {
+            width: 200px;
+            height: 200px;
+            background: #4a6cf7;
+            top: -60px;
+            right: -40px;
+            animation: floatOrb1 8s ease-in-out infinite;
+        }
+
+        body::after {
+            width: 180px;
+            height: 180px;
+            background: #4ecdc4;
+            bottom: -50px;
+            left: -30px;
+            animation: floatOrb2 10s ease-in-out infinite;
+        }
+
+        @keyframes floatOrb1 {
+
+            0%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            50% {
+                transform: translate(-20px, 30px);
+            }
+        }
+
+        @keyframes floatOrb2 {
+
+            0%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            50% {
+                transform: translate(20px, -20px);
+            }
+        }
+
+        /* ── Header ── */
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 18px 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header-icon {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            background: rgba(74, 108, 247, 0.15);
+            border: 1px solid rgba(74, 108, 247, 0.25);
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.3px;
+        }
+
+        .header h1 span {
+            background: linear-gradient(135deg, #4a6cf7, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* ── Tabs ── */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            padding: 0 18px 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 9px 0;
+            text-align: center;
+            font-size: 11.5px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .6px;
+            color: rgba(255, 255, 255, 0.35);
+            cursor: pointer;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            transition: all .2s ease;
+            background: transparent;
+        }
+
+        .tab:hover {
+            color: rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .tab.active {
+            color: #fff;
+            background: rgba(74, 108, 247, 0.18);
+            border-color: rgba(74, 108, 247, 0.3);
+            box-shadow: 0 0 20px rgba(74, 108, 247, 0.1);
+        }
+
+        /* ── Tab content ── */
+        .tab-content {
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            flex: 1;
+            position: relative;
+            z-index: 1;
+        }
+
+        .tab-content.active {
+            display: flex;
+        }
+
+        /* ── Settings panel ── */
+        .settings {
+            padding: 4px 18px 18px;
+        }
+
+        .settings label {
+            display: block;
+            font-size: 10.5px;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: .8px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .settings select {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: #fff;
+            font-family: inherit;
+            font-size: 13.5px;
+            outline: none;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23666'%3E%3Cpath d='M6 8.5L1 3.5h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            transition: all .2s ease;
+        }
+
+        .settings select:hover {
+            border-color: rgba(74, 108, 247, 0.4);
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .settings select:focus {
+            border-color: rgba(74, 108, 247, 0.5);
+            box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.12);
+        }
+
+        .settings select option {
+            background: #1a1a3e;
+            color: #fff;
+        }
+
+        .settings .setting-group {
+            margin-bottom: 16px;
+        }
+
+        .settings .glass-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 14px;
+            padding: 14px 16px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .settings input[type="range"] {
+            flex: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            outline: none;
+            transition: background .2s;
+        }
+
+        .settings input[type="range"]:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .settings input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4a6cf7, #6b8cff);
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 2px 8px rgba(74, 108, 247, 0.35);
+            transition: transform .15s, box-shadow .15s;
+        }
+
+        .settings input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            box-shadow: 0 2px 12px rgba(74, 108, 247, 0.5);
+        }
+
+        .settings input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4a6cf7, #6b8cff);
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 2px 8px rgba(74, 108, 247, 0.35);
+        }
+
+        .slider-value {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            min-width: 36px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            font-weight: 500;
+        }
+
+        .saved-msg {
+            margin-top: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #4ecdc4;
+            opacity: 0;
+            transition: opacity .3s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .saved-msg.show {
+            opacity: 1;
+        }
+
+        .settings input[type="text"],
+        .settings input[type="password"] {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: #fff;
+            font-family: inherit;
+            font-size: 13px;
+            outline: none;
+            transition: all .2s ease;
+            box-sizing: border-box;
+        }
+
+        .settings input[type="text"]:hover,
+        .settings input[type="password"]:hover {
+            border-color: rgba(74, 108, 247, 0.4);
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .settings input[type="text"]:focus,
+        .settings input[type="password"]:focus {
+            border-color: rgba(74, 108, 247, 0.5);
+            box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.12);
+        }
+
+        .settings input[type="text"]::placeholder,
+        .settings input[type="password"]::placeholder {
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        .tts-mode-toggle {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .tts-mode-btn {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.45);
+            font-family: inherit;
+            font-size: 11.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s ease;
+            text-align: center;
+        }
+
+        .tts-mode-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .tts-mode-btn.active {
+            background: rgba(74, 108, 247, 0.2);
+            border-color: rgba(74, 108, 247, 0.4);
+            color: #6b8cff;
+        }
+
+        .el-settings {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .el-settings.visible {
+            display: block;
+        }
+
+        .el-status {
+            font-size: 11px;
+            margin-top: 6px;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .el-status.ok {
+            color: #4ecdc4;
+        }
+
+        .el-status.err {
+            color: #ff6b6b;
+        }
+
+        .el-help {
+            margin-top: 8px;
+            padding: 10px 12px;
+            background: rgba(78, 205, 196, 0.06);
+            border: 1px solid rgba(78, 205, 196, 0.12);
+            border-radius: 10px;
+            font-size: 10.5px;
+            color: rgba(255, 255, 255, 0.4);
+            line-height: 1.6;
+        }
+
+        .el-help a {
+            color: #4ecdc4;
+            text-decoration: none;
+        }
+
+        .el-help a:hover {
+            text-decoration: underline;
+        }
+
+        .el-help ol {
+            margin: 4px 0 0 16px;
+            padding: 0;
+        }
+
+        .tip {
+            margin-top: 18px;
+            padding: 12px 14px;
+            background: rgba(74, 108, 247, 0.06);
+            border: 1px solid rgba(74, 108, 247, 0.1);
+            border-radius: 12px;
+            font-size: 11.5px;
+            color: rgba(255, 255, 255, 0.45);
+            line-height: 1.6;
+        }
+
+        /* ── Words panel ── */
+        .words-panel {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 6px;
+            padding: 6px 18px 10px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.4);
+            cursor: pointer;
+            transition: all .2s ease;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+
+        .filter-btn:hover {
+            border-color: rgba(74, 108, 247, 0.3);
+            color: rgba(255, 255, 255, 0.7);
+            background: rgba(74, 108, 247, 0.08);
+        }
+
+        .filter-btn.active {
+            background: linear-gradient(135deg, rgba(74, 108, 247, 0.25), rgba(78, 205, 196, 0.15));
+            border-color: rgba(74, 108, 247, 0.35);
+            color: #fff;
+            box-shadow: 0 2px 12px rgba(74, 108, 247, 0.15);
+        }
+
+        /* Stats */
+        .stats {
+            padding: 2px 18px 8px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.25);
+            font-weight: 500;
+        }
+
+        /* Word list */
+        .word-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 18px 8px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+        }
+
+        .word-list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .word-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .word-item {
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            transition: all .2s ease;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+
+        .word-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .word-item .wi-texts {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .word-item .wi-original {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.55);
+            word-break: break-word;
+        }
+
+        .word-item .wi-translated {
+            font-size: 13px;
+            font-weight: 600;
+            color: #4ecdc4;
+            word-break: break-word;
+            margin-top: 3px;
+        }
+
+        .word-item .wi-meta {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.2);
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        .word-item .wi-sentence {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.35);
+            margin-top: 4px;
+            padding-top: 4px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            word-break: break-word;
+            line-height: 1.4;
+        }
+
+        .word-item .wi-sentence .wi-cloze {
+            color: #4ecdc4;
+            font-weight: 600;
+        }
+
+        .word-item .wi-delete {
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.25);
+            cursor: pointer;
+            padding: 4px 6px;
+            font-size: 12px;
+            line-height: 1;
+            border-radius: 8px;
+            transition: all .2s ease;
+        }
+
+        .word-item .wi-delete:hover {
+            color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+            border-color: rgba(255, 107, 107, 0.2);
+        }
+
+        .word-item.new-item {
+            border-left: 2px solid rgba(74, 108, 247, 0.6);
+            background: rgba(74, 108, 247, 0.04);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 16px;
+            color: rgba(255, 255, 255, 0.25);
+            font-size: 13px;
+        }
+
+        .empty-state svg {
+            margin-bottom: 12px;
+            opacity: .2;
+        }
+
+        /* Export section */
+        .export-section {
+            padding: 10px 18px 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .export-btn {
+            flex: 1;
+            min-width: 80px;
+            padding: 9px 14px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 10px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all .2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-family: inherit;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+
+        .export-anki {
+            background: rgba(139, 195, 74, 0.08);
+            border-color: rgba(139, 195, 74, 0.15);
+            color: #8bc34a;
+        }
+
+        .export-anki:hover {
+            background: rgba(139, 195, 74, 0.15);
+            border-color: rgba(139, 195, 74, 0.25);
+            box-shadow: 0 2px 12px rgba(139, 195, 74, 0.1);
+        }
+
+        .export-csv {
+            background: rgba(74, 154, 245, 0.08);
+            border-color: rgba(74, 154, 245, 0.15);
+            color: #4a9af5;
+        }
+
+        .export-csv:hover {
+            background: rgba(74, 154, 245, 0.15);
+            border-color: rgba(74, 154, 245, 0.25);
+            box-shadow: 0 2px 12px rgba(74, 154, 245, 0.1);
+        }
+
+        .export-clear {
+            background: rgba(255, 107, 107, 0.06);
+            border-color: rgba(255, 107, 107, 0.12);
+            color: #ff6b6b;
+            flex: 0;
+            padding: 9px 12px;
+        }
+
+        .export-clear:hover {
+            background: rgba(255, 107, 107, 0.14);
+            border-color: rgba(255, 107, 107, 0.25);
+            box-shadow: 0 2px 12px rgba(255, 107, 107, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4a6cf7" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 8l6 6" />
+                <path d="M4 14l6-6 2-3" />
+                <path d="M2 5h12" />
+                <path d="M7 2h1" />
+                <path d="M22 22l-5-10-5 10" />
+                <path d="M14 18h6" />
+            </svg>
+        </div>
+        <h1><span>Quick Translator</span></h1>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab active" data-tab="settings">⚙ Ustawienia</button>
+        <button class="tab" data-tab="words">📚 Zapisane słowa</button>
+    </div>
+
+    <!-- Settings Tab -->
+    <div class="tab-content active" id="tab-settings">
+        <div class="settings">
+            <div class="setting-group">
+                <label for="targetLang">Język docelowy</label>
+                <select id="targetLang">
+                    <option value="pl">🇵🇱 Polski</option>
+                    <option value="en">🇬🇧 English</option>
+                    <option value="de">🇩🇪 Deutsch</option>
+                    <option value="fr">🇫🇷 Français</option>
+                    <option value="es">🇪🇸 Español</option>
+                    <option value="it">🇮🇹 Italiano</option>
+                    <option value="pt">🇵🇹 Português</option>
+                    <option value="uk">🇺🇦 Українська</option>
+                    <option value="ru">🇷🇺 Русский</option>
+                    <option value="cs">🇨🇿 Čeština</option>
+                    <option value="nl">🇳🇱 Nederlands</option>
+                    <option value="sv">🇸🇪 Svenska</option>
+                    <option value="ja">🇯🇵 日本語</option>
+                    <option value="ko">🇰🇷 한국어</option>
+                    <option value="zh">🇨🇳 中文</option>
+                    <option value="ar">🇸🇦 العربية</option>
+                    <option value="hi">🇮🇳 हिन्दी</option>
+                    <option value="tr">🇹🇷 Türkçe</option>
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <label>Silnik głosu</label>
+                <div class="tts-mode-toggle">
+                    <button class="tts-mode-btn active" data-mode="browser" id="modeBrowser">🔊 Przeglądarka</button>
+                    <button class="tts-mode-btn" data-mode="elevenlabs" id="modeEL">🎙️ ElevenLabs</button>
+                </div>
+            </div>
+
+            <!-- Browser TTS settings -->
+            <div id="browserTtsSettings">
+                <div class="setting-group">
+                    <label for="voiceSelect">Głos TTS</label>
+                    <select id="voiceSelect">
+                        <option value="">🔊 Domyślny</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label for="rateRange">Szybkość mowy</label>
+                    <div class="glass-card">
+                        <div class="slider-row">
+                            <input type="range" id="rateRange" min="0.3" max="2" step="0.1" value="0.95">
+                            <span class="slider-value" id="rateValue">0.95</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ElevenLabs settings -->
+            <div id="elSettings" class="el-settings">
+                <div class="setting-group">
+                    <label for="elApiKey">API Key</label>
+                    <input type="password" id="elApiKey" placeholder="sk_xxxxxxxxxxxxxxxxxxxxxxxx">
+                </div>
+                <div class="setting-group">
+                    <label for="elVoiceSelect">Głos ElevenLabs</label>
+                    <select id="elVoiceSelect">
+                        <option value="">— Wpisz API key —</option>
+                    </select>
+                </div>
+                <div class="el-status" id="elStatus"></div>
+                <div class="el-help">
+                    📖 <strong>Jak zdobyć API key:</strong>
+                    <ol>
+                        <li>Zarejestruj się na <a href="https://elevenlabs.io" target="_blank">elevenlabs.io</a>
+                            (darmowy plan = 10 000 znaków/mies.)</li>
+                        <li>Kliknij ikonę profilu → <strong>Profile + API key</strong></li>
+                        <li>Kliknij <strong>Create API Key</strong> lub skopiuj istniejący</li>
+                        <li>Wklej klucz powyżej — głosy załadują się automatycznie</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="saved-msg" id="saved">✓ Zapisano</div>
+            <div class="tip">
+                💡 Zaznacz tekst na stronie → kliknij ikonę tłumaczenia → kliknij 🔖 aby zapisać słowo do kolekcji.
+            </div>
+        </div>
+    </div>
+
+    <!-- Words Tab -->
+    <div class="tab-content" id="tab-words">
+        <div class="words-panel">
+            <!-- Filters -->
+            <div class="filters">
+                <button class="filter-btn active" data-filter="all">Wszystkie</button>
+                <button class="filter-btn" data-filter="today">Dziś</button>
+                <button class="filter-btn" data-filter="week">Tydzień</button>
+                <button class="filter-btn" data-filter="month">Miesiąc</button>
+                <button class="filter-btn" data-filter="new">🆕 Niepobrane</button>
+            </div>
+            <div class="stats" id="stats"></div>
+
+            <!-- Word list -->
+            <div class="word-list" id="wordList"></div>
+
+            <!-- Export -->
+            <div class="export-section">
+                <button class="export-btn export-anki" id="exportAnki" title="Eksportuj do pliku Anki (.txt)">
+                    📋 Anki
+                </button>
+                <button class="export-btn export-csv" id="exportCsv" title="Eksportuj do Excel (.csv)">
+                    📊 Excel CSV
+                </button>
+                <button class="export-btn export-clear" id="clearAll" title="Usuń widoczne słowa">
+                    🗑
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>
