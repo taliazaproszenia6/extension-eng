@@ -50,6 +50,20 @@ select.addEventListener("change", () => {
     chrome.storage.sync.set({ targetLang: select.value }, flashSaved);
 });
 
+// ── Hover Translate toggle ────────────────────────────────────────
+const hoverToggle = document.getElementById("hoverTranslate");
+
+chrome.storage.sync.get({ hoverTranslate: false }, (data) => {
+    hoverToggle.checked = data.hoverTranslate;
+});
+
+hoverToggle.addEventListener("change", () => {
+    chrome.storage.sync.set(
+        { hoverTranslate: hoverToggle.checked },
+        flashSaved,
+    );
+});
+
 // ── Populate voices ───────────────────────────────────────────────
 function loadVoices(selectedVoice) {
     const voices = window.speechSynthesis.getVoices();

@@ -22,7 +22,8 @@
                 "youtube.js",
                 "netflix.js",
                 "lookmovie2.js",
-                "x.js"
+                "x.js",
+                "hover.js"
             ],
             "run_at": "document_idle"
         }

@@ -504,6 +504,9 @@
         if (isOwnUI(e.target)) return;
 
         setTimeout(() => {
+            // Skip if hover-translate module just handled a click
+            if (QT.hoverClickActive) return;
+
             const selection = window.getSelection();
             const text = selection?.toString().trim();
             if (!text || text.length === 0 || text.length > 5000) {
