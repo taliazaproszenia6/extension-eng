@@ -58,6 +58,7 @@
     function dismiss() {
         if (!clickLocked) return;
         clickLocked = false;
+        QT.hoverClickActive = false;
         hideTooltip();
         clearHighlight();
     }
@@ -299,15 +300,16 @@
     // ═══════════════════════════════════════════════════════════════
 
     async function handleClick(wordInfo) {
+        // clickLocked & hoverClickActive already set in mousedown
         clearTimeout(hoverTimer);
-        clickLocked = true;
-        QT.hoverClickActive = true;
-        setTimeout(() => {
-            QT.hoverClickActive = false;
-        }, 100);
+        isHovering = false;
 
         const { word, range, textNode, start, end } = wordInfo;
-        if (!word) return;
+        if (!word) {
+            clickLocked = false;
+            QT.hoverClickActive = false;
+            return;
+        }
 
         highlightWord(range);
 
@@ -383,28 +385,60 @@
         }
     });
 
-    // Click: mousedown records potential word click
-    document.addEventListener("mousedown", (e) => {
-        if (!enabled || isOwnUI(e.target)) {
-            pendingWordClick = null;
-            return;
-        }
-        if (clickLocked) {
-            pendingWordClick = null;
-            return;
-        }
+    // Click: mousedown – IMMEDIATELY lock state so content.js dismiss
+    // (which also fires on mousedown) does not kill our tooltip.
+    document.addEventListener(
+        "mousedown",
+        (e) => {
+            if (!enabled || isOwnUI(e.target)) {
+                pendingWordClick = null;
+                return;
+            }
 
-        const wordInfo = getWordAtPoint(e.clientX, e.clientY);
-        if (wordInfo && wordInfo.word.length >= 2) {
-            pendingWordClick = { wordInfo, x: e.clientX, y: e.clientY };
-        } else {
-            pendingWordClick = null;
-        }
-    });
+            // If already showing a click-locked tooltip, dismiss it
+            if (clickLocked) {
+                pendingWordClick = null;
+                dismiss();
+                return;
+            }
+
+            // Skip interactive elements
+            if (
+                e.target.closest?.(
+                    "a[href], button, input, textarea, select, [role='button']",
+                )
+            ) {
+                pendingWordClick = null;
+                return;
+            }
+
+            const wordInfo = getWordAtPoint(e.clientX, e.clientY);
+            if (wordInfo && wordInfo.word.length >= 2) {
+                // Lock immediately – prevents content.js dismiss from firing
+                clickLocked = true;
+                QT.hoverClickActive = true;
+                isHovering = false;
+                clearTimeout(hoverTimer);
+                lastWord = null;
+                pendingWordClick = {
+                    wordInfo,
+                    x: e.clientX,
+                    y: e.clientY,
+                };
+            } else {
+                pendingWordClick = null;
+            }
+        },
+        true,
+    ); // capture phase – fires before content.js
 
     // Click: mouseup confirms the click (no drag, no selection)
     document.addEventListener("mouseup", (e) => {
-        if (!enabled || !pendingWordClick || isOwnUI(e.target)) {
+        if (!enabled || !pendingWordClick) {
+            return;
+        }
+        if (isOwnUI(e.target)) {
+            // Clicked on our own UI – abort word click but keep tooltip
             pendingWordClick = null;
             return;
         }
@@ -414,6 +448,8 @@
         const dy = e.clientY - pendingWordClick.y;
         if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
             pendingWordClick = null;
+            clickLocked = false;
+            QT.hoverClickActive = false;
             return;
         }
 
@@ -421,16 +457,8 @@
         const sel = window.getSelection();
         if (sel && sel.toString().trim().length > 0) {
             pendingWordClick = null;
-            return;
-        }
-
-        // Skip interactive elements
-        if (
-            e.target.closest?.(
-                "a[href], button, input, textarea, select, [role='button']",
-            )
-        ) {
-            pendingWordClick = null;
+            clickLocked = false;
+            QT.hoverClickActive = false;
             return;
         }
 

@@ -533,6 +533,8 @@
 
     document.addEventListener("mousedown", (e) => {
         if (isOwnUI(e.target)) return;
+        // Don't dismiss when hover-translate module is handling a word click
+        if (QT.hoverClickActive) return;
         runDismiss();
         hideAll();
     });
