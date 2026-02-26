@@ -542,16 +542,18 @@ document.getElementById("exportCsv").addEventListener("click", () => {
 
         // BOM for Excel UTF-8
         const BOM = "\uFEFF";
-        const header = "Oryginał;Tłumaczenie;Język źr.;Język doc.;Data;URL";
+        const header =
+            "Oryginał;Tłumaczenie;Zdanie;Tłumaczenie zdania;Język źr.;Język doc.;Data";
         const rows = words.map((w) => {
-            const date = new Date(w.timestamp).toLocaleString("pl-PL");
+            const date = new Date(w.timestamp).toLocaleDateString("pl-PL");
             return [
                 csvCell(w.original),
                 csvCell(w.translated),
+                csvCell(w.sentence || ""),
+                csvCell(w.sentenceTranslated || ""),
                 w.srcLang || "",
                 w.tgtLang || "",
                 date,
-                w.url || "",
             ].join(";");
         });
         const content = BOM + header + "\n" + rows.join("\n");
