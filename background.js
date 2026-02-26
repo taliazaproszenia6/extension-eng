@@ -16,9 +16,32 @@ async function updateBadge() {
             chrome.action.setBadgeBackgroundColor({ color: "#4a6cf7" });
         } else {
             chrome.action.setBadgeText({ text: "" });
+            // Schedule alarm for the next word that becomes due
+            scheduleNextDueAlarm(words, now);
         }
     } catch (err) {
         console.warn("[QT] Badge update error:", err);
+    }
+}
+
+// ── Schedule alarm for the exact moment the next review is due ────
+async function scheduleNextDueAlarm(words, now) {
+    // Find the soonest future nextReview
+    let soonest = Infinity;
+    for (const w of words) {
+        if (w.sr && w.sr.nextReview > now && w.sr.nextReview < soonest) {
+            soonest = w.sr.nextReview;
+        }
+    }
+
+    // Clear old precise alarm
+    await chrome.alarms.clear("nextDueReview");
+
+    if (soonest < Infinity) {
+        const delayMs = soonest - now;
+        // Chrome alarms minimum is ~0.5 min, so use at least that
+        const delayMinutes = Math.max(delayMs / 60000, 0.5);
+        chrome.alarms.create("nextDueReview", { delayInMinutes: delayMinutes });
     }
 }
 
@@ -48,11 +71,12 @@ async function checkAndNotify() {
 }
 
 // ── Alarms ────────────────────────────────────────────────────────
-chrome.alarms.create("updateBadge", { periodInMinutes: 30 });
+chrome.alarms.create("updateBadge", { periodInMinutes: 5 });
 chrome.alarms.create("reviewNotification", { periodInMinutes: 360 }); // every 6h
 
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "updateBadge") updateBadge();
+    if (alarm.name === "nextDueReview") updateBadge(); // precise trigger
     if (alarm.name === "reviewNotification") checkAndNotify();
 });
 
