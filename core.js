@@ -456,6 +456,15 @@
                     w.translated === entry.translated,
             );
             if (!exists) {
+                // Attach spaced-repetition metadata
+                if (!entry.sr) {
+                    entry.sr = {
+                        step: 0, // position in interval ladder
+                        interval: 0, // current interval in days
+                        nextReview: Date.now(), // due immediately
+                        lastReview: null,
+                    };
+                }
                 words.push(entry);
                 chrome.storage.local.set({ savedWords: words });
             }

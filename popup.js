@@ -20,6 +20,7 @@ document.querySelectorAll(".tab").forEach((tab) => {
             .getElementById("tab-" + tab.dataset.tab)
             .classList.add("active");
         if (tab.dataset.tab === "words") loadWords();
+        if (tab.dataset.tab === "review") loadReviewQueue();
     });
 });
 
@@ -634,3 +635,366 @@ function escapeAttr(str) {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  SPACED REPETITION  –  Step-based intervals (1d→3d→7d→14d→30d→90d)
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Interval steps (in days): 1d → 3d → 7d → 14d → 30d → 90d ────
+const SR_STEPS = [1, 3, 7, 14, 30, 90];
+
+// ── In-session delays (in minutes) for grades 1-4 ────────────────
+const SESSION_DELAYS = {
+    1: 1, // Nie wiem  → 1 minuta
+    2: 3, // Źle       → 3 minuty
+    3: 10, // Trudne    → 10 minut
+    4: 60, // OK        → 1 godzina
+};
+
+/**
+ * Calculate new SR data after rating.
+ *
+ * Grades 1-4 → short in-session delay (minutes), step goes DOWN or stays.
+ *   1 (Nie wiem)  → reset step to 0, come back in 1 min
+ *   2 (Źle)       → step - 2 (min 0), come back in 3 min
+ *   3 (Trudne)    → step - 1 (min 0), come back in 10 min
+ *   4 (OK)        → stay at same step, come back in 1 hour
+ *
+ * Grade 5 (Łatwe) → advance step, next review in days (1d→3d→7d→…)
+ */
+function srUpdate(sr, grade) {
+    let step = sr.step;
+
+    if (grade === 5) {
+        // Advance to next long-term step
+        step = step + 1;
+        const intervalDays = getIntervalForStep(step);
+        return {
+            step,
+            interval: intervalDays,
+            nextReview: Date.now() + intervalDays * 24 * 60 * 60 * 1000,
+            lastReview: Date.now(),
+        };
+    }
+
+    // Grades 1-4: short delay, adjust step downward
+    if (grade === 1) {
+        step = 0;
+    } else if (grade === 2) {
+        step = Math.max(0, step - 2);
+    } else if (grade === 3) {
+        step = Math.max(0, step - 1);
+    }
+    // grade 4: step stays
+
+    const delayMinutes = SESSION_DELAYS[grade];
+    return {
+        step,
+        interval: sr.interval, // keep last long-term interval for reference
+        nextReview: Date.now() + delayMinutes * 60 * 1000,
+        lastReview: Date.now(),
+    };
+}
+
+/** Get interval in days for a given step */
+function getIntervalForStep(step) {
+    if (step < SR_STEPS.length) return SR_STEPS[step];
+    // Beyond last step: keep growing (90 * 1.5^n)
+    const extra = step - SR_STEPS.length + 1;
+    return Math.round(SR_STEPS[SR_STEPS.length - 1] * Math.pow(1.5, extra));
+}
+
+/** Preview what the next review time label will be for a given grade */
+function previewLabel(sr, grade) {
+    if (grade === 5) {
+        const step = sr.step + 1;
+        const days = getIntervalForStep(step);
+        return formatIntervalDays(days);
+    }
+    const mins = SESSION_DELAYS[grade];
+    return formatIntervalMinutes(mins);
+}
+
+function formatIntervalDays(days) {
+    if (days <= 1) return "1 dzień";
+    if (days < 7) return `${days} dni`;
+    if (days === 7) return "1 tydz.";
+    if (days < 30) {
+        const w = Math.round(days / 7);
+        return w === 1 ? "1 tydz." : `${w} tyg.`;
+    }
+    if (days === 30) return "1 mies.";
+    const m = Math.round(days / 30);
+    return m === 1 ? "1 mies." : `${m} mies.`;
+}
+
+function formatIntervalMinutes(mins) {
+    if (mins < 60) return `${mins} min`;
+    const h = Math.round(mins / 60);
+    return h === 1 ? "1 godz." : `${h} godz.`;
+}
+
+// ── Review state ──────────────────────────────────────────────────
+let reviewQueue = [];
+let reviewIndex = 0;
+let reviewAnswerShown = false;
+let reviewTotalDue = 0;
+
+// ── Default SR data for words that don't have it ──────────────────
+function ensureSR(word) {
+    if (!word.sr) {
+        word.sr = {
+            step: 0,
+            interval: 0,
+            nextReview: 0,
+            lastReview: null,
+        };
+    }
+    // Migrate old SM-2 format → new step format
+    if (word.sr.step === undefined) {
+        // Try to guess step from old interval
+        const oldInterval = word.sr.interval || 0;
+        let step = 0;
+        for (let i = SR_STEPS.length - 1; i >= 0; i--) {
+            if (oldInterval >= SR_STEPS[i]) {
+                step = i;
+                break;
+            }
+        }
+        word.sr = {
+            step,
+            interval: word.sr.interval || 0,
+            nextReview: word.sr.nextReview || 0,
+            lastReview: word.sr.lastReview || null,
+        };
+    }
+    return word;
+}
+
+// ── Load due reviews ──────────────────────────────────────────────
+function loadReviewQueue() {
+    chrome.storage.local.get({ savedWords: [] }, (data) => {
+        const words = data.savedWords || [];
+        const now = Date.now();
+
+        reviewQueue = words
+            .filter((w) => {
+                if (!w.sr) return true;
+                return w.sr.nextReview <= now;
+            })
+            .map(ensureSR);
+
+        // Shuffle
+        for (let i = reviewQueue.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [reviewQueue[i], reviewQueue[j]] = [reviewQueue[j], reviewQueue[i]];
+        }
+
+        reviewTotalDue = reviewQueue.length;
+        reviewIndex = 0;
+        reviewAnswerShown = false;
+        renderReview();
+    });
+}
+
+// ── Badge on review tab ───────────────────────────────────────────
+function updateReviewTabBadge(count) {
+    const tab = document.getElementById("tabReview");
+    if (!tab) return;
+    if (count > 0) {
+        tab.innerHTML = `🧠 Powtórki <span class="tab-badge">${count}</span>`;
+    } else {
+        tab.textContent = "🧠 Powtórki";
+    }
+}
+
+// ── On popup open → load badge count ──────────────────────────────
+function initReviewBadge() {
+    chrome.storage.local.get({ savedWords: [] }, (data) => {
+        const words = data.savedWords || [];
+        const now = Date.now();
+        const dueCount = words.filter((w) => {
+            if (!w.sr) return true;
+            return w.sr.nextReview <= now;
+        }).length;
+        updateReviewTabBadge(dueCount);
+    });
+}
+initReviewBadge();
+
+// ── Render review card ────────────────────────────────────────────
+function renderReview() {
+    const card = document.getElementById("reviewCard");
+    const countEl = document.getElementById("reviewCount");
+    const progressBar = document.getElementById("reviewProgressBar");
+
+    if (reviewQueue.length === 0) {
+        countEl.textContent = "";
+        progressBar.style.width = "100%";
+        card.innerHTML = `
+            <div class="review-empty">
+                <div class="review-empty-icon">✅</div>
+                <div class="review-empty-text">Brak słów do powtórki!</div>
+                <div class="review-empty-sub">Dodaj nowe słowa lub wróć później.</div>
+            </div>`;
+        updateReviewTabBadge(0);
+        return;
+    }
+
+    if (reviewIndex >= reviewQueue.length) {
+        countEl.textContent = `${reviewTotalDue}/${reviewTotalDue}`;
+        progressBar.style.width = "100%";
+        card.innerHTML = `
+            <div class="review-done">
+                <div class="review-done-icon">🎉</div>
+                <div class="review-done-text">Gratulacje!</div>
+                <div class="review-done-sub">Wykonałeś wszystkie ${reviewTotalDue} powtórek na dziś!</div>
+            </div>`;
+        updateReviewTabBadge(0);
+        return;
+    }
+
+    const w = reviewQueue[reviewIndex];
+    countEl.textContent = `${reviewIndex + 1}/${reviewTotalDue}`;
+    progressBar.style.width = `${Math.round((reviewIndex / reviewTotalDue) * 100)}%`;
+
+    if (!reviewAnswerShown) {
+        card.innerHTML = `
+            <div class="review-question">
+                <div class="review-word">${escapeHtml(w.original)}</div>
+                ${w.sentence ? `<div class="review-context">${escapeHtml(w.sentence)}</div>` : ""}
+                <div class="review-meta">${(w.srcLang || "?").toUpperCase()} → ${(w.tgtLang || "?").toUpperCase()}</div>
+            </div>
+            <button class="review-reveal-btn" id="revealBtn">▸ Pokaż odpowiedź</button>
+            <div class="review-hint">Naciśnij <kbd>Spacja</kbd> aby odsłonić</div>`;
+
+        document
+            .getElementById("revealBtn")
+            .addEventListener("click", revealAnswer);
+    } else {
+        renderAnswer(w);
+    }
+}
+
+function revealAnswer() {
+    reviewAnswerShown = true;
+    renderAnswer(reviewQueue[reviewIndex]);
+}
+
+function renderAnswer(w) {
+    const card = document.getElementById("reviewCard");
+    const sr = w.sr || { step: 0, interval: 0 };
+
+    // Preview labels for each grade
+    const labels = [1, 2, 3, 4, 5].map((g) => previewLabel(sr, g));
+
+    card.innerHTML = `
+        <div class="review-question">
+            <div class="review-word">${escapeHtml(w.original)}</div>
+            ${w.sentence ? `<div class="review-context">${escapeHtml(w.sentence)}</div>` : ""}
+        </div>
+        <div class="review-answer">
+            <div class="review-translation">${escapeHtml(w.translated)}</div>
+            ${w.sentenceTranslated ? `<div class="review-sentence-trans">${escapeHtml(w.sentenceTranslated)}</div>` : ""}
+        </div>
+        <div class="review-rating">
+            <div class="review-rating-label">Jak dobrze znałeś?</div>
+            <div class="review-rating-buttons">
+                <button class="review-rate-btn rate-1" data-grade="1" title="Nie pamiętam">
+                    <span class="rate-key">1</span>
+                    <span class="rate-label">Nie wiem</span>
+                    <span class="review-next-info">${labels[0]}</span>
+                </button>
+                <button class="review-rate-btn rate-2" data-grade="2" title="Źle">
+                    <span class="rate-key">2</span>
+                    <span class="rate-label">Źle</span>
+                    <span class="review-next-info">${labels[1]}</span>
+                </button>
+                <button class="review-rate-btn rate-3" data-grade="3" title="Trudne">
+                    <span class="rate-key">3</span>
+                    <span class="rate-label">Trudne</span>
+                    <span class="review-next-info">${labels[2]}</span>
+                </button>
+                <button class="review-rate-btn rate-4" data-grade="4" title="OK">
+                    <span class="rate-key">4</span>
+                    <span class="rate-label">OK</span>
+                    <span class="review-next-info">${labels[3]}</span>
+                </button>
+                <button class="review-rate-btn rate-5" data-grade="5" title="Łatwe">
+                    <span class="rate-key">5</span>
+                    <span class="rate-label">Łatwe</span>
+                    <span class="review-next-info">${labels[4]}</span>
+                </button>
+            </div>
+            <div class="review-hint">Klawisze <kbd>1</kbd>-<kbd>5</kbd> = ocena</div>
+        </div>`;
+
+    // Attach rating handlers
+    card.querySelectorAll(".review-rate-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            rateWord(parseInt(btn.dataset.grade));
+        });
+    });
+}
+
+// ── Rate word & update storage ────────────────────────────────────
+function rateWord(grade) {
+    const w = reviewQueue[reviewIndex];
+    ensureSR(w);
+
+    // Apply SR update
+    w.sr = srUpdate(w.sr, grade);
+
+    // Persist
+    chrome.storage.local.get({ savedWords: [] }, (data) => {
+        const words = data.savedWords || [];
+        const idx = words.findIndex(
+            (x) => x.original === w.original && x.translated === w.translated,
+        );
+        if (idx !== -1) {
+            words[idx].sr = w.sr;
+            chrome.storage.local.set({ savedWords: words }, () => {
+                if (grade < 5) {
+                    // Grades 1-4: re-insert word later in the queue
+                    // so it comes back again in this session
+                    reviewQueue.splice(reviewIndex, 1);
+                    // Insert a few cards later (or at end if queue is short)
+                    const insertAt = Math.min(
+                        reviewIndex + 2 + Math.floor(Math.random() * 3),
+                        reviewQueue.length,
+                    );
+                    reviewQueue.splice(insertAt, 0, w);
+                    // Don't increment reviewIndex – current index now has next word
+                    reviewTotalDue = reviewQueue.length;
+                } else {
+                    // Grade 5: word is done, advance
+                    reviewIndex++;
+                }
+                reviewAnswerShown = false;
+                renderReview();
+            });
+        } else {
+            // word may have been deleted – just advance
+            reviewIndex++;
+            reviewAnswerShown = false;
+            renderReview();
+        }
+    });
+}
+
+// ── Keyboard shortcuts for review (1-5 = rate, Space = reveal) ───
+document.addEventListener("keydown", (e) => {
+    const reviewTab = document.getElementById("tab-review");
+    if (!reviewTab || !reviewTab.classList.contains("active")) return;
+    if (reviewIndex >= reviewQueue.length || reviewQueue.length === 0) return;
+
+    if (e.key === " " || e.key === "Spacebar") {
+        e.preventDefault();
+        if (!reviewAnswerShown) revealAnswer();
+    }
+
+    if (reviewAnswerShown && e.key >= "1" && e.key <= "5") {
+        e.preventDefault();
+        rateWord(parseInt(e.key));
+    }
+});

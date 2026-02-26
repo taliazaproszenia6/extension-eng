@@ -725,6 +725,312 @@
             border-color: rgba(255, 107, 107, 0.25);
             box-shadow: 0 2px 12px rgba(255, 107, 107, 0.1);
         }
+
+        /* ── Review / Spaced Repetition panel ── */
+        .review-panel {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+            padding: 4px 18px 18px;
+        }
+
+        .review-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .review-icon {
+            font-size: 20px;
+        }
+
+        .review-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.8);
+            flex: 1;
+        }
+
+        .review-count {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.4);
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .review-progress {
+            height: 3px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 3px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+
+        .review-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4a6cf7, #4ecdc4);
+            border-radius: 3px;
+            transition: width .3s ease;
+        }
+
+        .review-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .review-question {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .review-word {
+            font-size: 22px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .review-context {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.35);
+            line-height: 1.5;
+            max-width: 280px;
+            margin: 0 auto;
+        }
+
+        .review-meta {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.2);
+            margin-top: 6px;
+            font-weight: 500;
+        }
+
+        .review-reveal-btn {
+            padding: 12px 28px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 12px;
+            border: 1px solid rgba(74, 108, 247, 0.3);
+            background: rgba(74, 108, 247, 0.15);
+            color: #6b8cff;
+            cursor: pointer;
+            transition: all .2s ease;
+            font-family: inherit;
+            margin-bottom: 8px;
+        }
+
+        .review-reveal-btn:hover {
+            background: rgba(74, 108, 247, 0.25);
+            border-color: rgba(74, 108, 247, 0.5);
+            box-shadow: 0 4px 16px rgba(74, 108, 247, 0.2);
+        }
+
+        .review-answer {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 14px 20px;
+            background: rgba(78, 205, 196, 0.06);
+            border: 1px solid rgba(78, 205, 196, 0.12);
+            border-radius: 14px;
+            width: 100%;
+        }
+
+        .review-translation {
+            font-size: 18px;
+            font-weight: 600;
+            color: #4ecdc4;
+        }
+
+        .review-sentence-trans {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.3);
+            margin-top: 6px;
+        }
+
+        .review-rating {
+            width: 100%;
+        }
+
+        .review-rating-label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.35);
+            text-align: center;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .review-rating-buttons {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+        }
+
+        .review-rate-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            padding: 10px 8px 8px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.04);
+            cursor: pointer;
+            transition: all .2s ease;
+            font-family: inherit;
+            min-width: 52px;
+        }
+
+        .review-rate-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .rate-key {
+            font-size: 14px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .rate-label {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.35);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+        }
+
+        .rate-1 {
+            border-color: rgba(255, 107, 107, 0.2);
+        }
+
+        .rate-1:hover {
+            background: rgba(255, 107, 107, 0.12);
+            border-color: rgba(255, 107, 107, 0.35);
+        }
+
+        .rate-1 .rate-key {
+            color: #ff6b6b;
+        }
+
+        .rate-2 {
+            border-color: rgba(255, 167, 38, 0.2);
+        }
+
+        .rate-2:hover {
+            background: rgba(255, 167, 38, 0.12);
+            border-color: rgba(255, 167, 38, 0.35);
+        }
+
+        .rate-2 .rate-key {
+            color: #ffa726;
+        }
+
+        .rate-3 {
+            border-color: rgba(255, 213, 79, 0.2);
+        }
+
+        .rate-3:hover {
+            background: rgba(255, 213, 79, 0.12);
+            border-color: rgba(255, 213, 79, 0.35);
+        }
+
+        .rate-3 .rate-key {
+            color: #ffd54f;
+        }
+
+        .rate-4 {
+            border-color: rgba(129, 199, 132, 0.2);
+        }
+
+        .rate-4:hover {
+            background: rgba(129, 199, 132, 0.12);
+            border-color: rgba(129, 199, 132, 0.35);
+        }
+
+        .rate-4 .rate-key {
+            color: #81c784;
+        }
+
+        .rate-5 {
+            border-color: rgba(78, 205, 196, 0.2);
+        }
+
+        .rate-5:hover {
+            background: rgba(78, 205, 196, 0.12);
+            border-color: rgba(78, 205, 196, 0.35);
+        }
+
+        .rate-5 .rate-key {
+            color: #4ecdc4;
+        }
+
+        .review-hint {
+            text-align: center;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.2);
+            margin-top: 10px;
+        }
+
+        .review-hint kbd {
+            display: inline-block;
+            padding: 1px 5px;
+            font-size: 10px;
+            font-family: inherit;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .review-empty,
+        .review-done {
+            text-align: center;
+            padding: 30px 20px;
+        }
+
+        .review-empty-icon,
+        .review-done-icon {
+            font-size: 36px;
+            margin-bottom: 12px;
+        }
+
+        .review-empty-text,
+        .review-done-text {
+            font-size: 15px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 6px;
+        }
+
+        .review-empty-sub,
+        .review-done-sub {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.25);
+        }
+
+        .review-next-info {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.2);
+            margin-top: 3px;
+        }
+
+        .tab-badge {
+            display: inline-block;
+            background: rgba(74, 108, 247, 0.5);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 10px;
+            margin-left: 4px;
+            min-width: 16px;
+            text-align: center;
+        }
     </style>
 </head>
 
@@ -748,7 +1054,8 @@
     <!-- Tabs -->
     <div class="tabs">
         <button class="tab active" data-tab="settings">⚙ Ustawienia</button>
-        <button class="tab" data-tab="words">📚 Zapisane słowa</button>
+        <button class="tab" data-tab="words">📚 Słowa</button>
+        <button class="tab" data-tab="review" id="tabReview">🧠 Powtórki</button>
     </div>
 
     <!-- Settings Tab -->
@@ -881,6 +1188,21 @@
                     🗑
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- Review Tab (Spaced Repetition) -->
+    <div class="tab-content" id="tab-review">
+        <div class="review-panel">
+            <div class="review-header">
+                <span class="review-icon">🧠</span>
+                <span class="review-title">Powtórka dnia</span>
+                <span class="review-count" id="reviewCount"></span>
+            </div>
+            <div class="review-progress" id="reviewProgress">
+                <div class="review-progress-bar" id="reviewProgressBar" style="width: 0%"></div>
+            </div>
+            <div class="review-card" id="reviewCard"></div>
         </div>
     </div>
 
