@@ -822,6 +822,39 @@ function initReviewBadge() {
 }
 initReviewBadge();
 
+// ── SVG icons for review TTS buttons ──────────────────────────────
+const SPEAK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+
+// ── TTS for popup (uses browser SpeechSynthesis) ──────────────────
+function popupSpeak(text, lang) {
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = lang || "en";
+    utter.rate = 0.9;
+    // Try to pick a good voice
+    const voices = window.speechSynthesis.getVoices();
+    const baseLang = (lang || "en").split("-")[0].toLowerCase();
+    const match = voices.find((v) => v.lang.toLowerCase().startsWith(baseLang));
+    if (match) utter.voice = match;
+    window.speechSynthesis.speak(utter);
+    return utter;
+}
+
+// ── Attach TTS handlers to all .review-speak-btn in card ──────────
+function attachReviewSpeakHandlers(card) {
+    card.querySelectorAll(".review-speak-btn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            btn.classList.add("speaking");
+            const utter = popupSpeak(btn.dataset.text, btn.dataset.lang);
+            const done = () => btn.classList.remove("speaking");
+            utter.onend = done;
+            utter.onerror = done;
+            setTimeout(done, 5000); // safety fallback
+        });
+    });
+}
+
 // ── Render review card ────────────────────────────────────────────
 function renderReview() {
     const card = document.getElementById("reviewCard");
@@ -859,15 +892,28 @@ function renderReview() {
     progressBar.style.width = `${Math.round((reviewIndex / reviewTotalDue) * 100)}%`;
 
     if (!reviewAnswerShown) {
+        const srcL = w.srcLang || "en";
         card.innerHTML = `
             <div class="review-question">
-                <div class="review-word">${escapeHtml(w.original)}</div>
-                ${w.sentence ? `<div class="review-context">${escapeHtml(w.sentence)}</div>` : ""}
+                <div class="review-word-row">
+                    <span class="review-word">${escapeHtml(w.original)}</span>
+                    <button class="review-speak-btn" data-text="${escapeAttr(w.original)}" data-lang="${escapeAttr(srcL)}" title="Odczytaj">${SPEAK_SVG}</button>
+                </div>
+                ${
+                    w.sentence
+                        ? `
+                <div class="review-context-row">
+                    <span class="review-context">"${escapeHtml(w.sentence)}"</span>
+                    <button class="review-speak-btn review-speak-sm" data-text="${escapeAttr(w.sentence)}" data-lang="${escapeAttr(srcL)}" title="Odczytaj zdanie">${SPEAK_SVG}</button>
+                </div>`
+                        : ""
+                }
                 <div class="review-meta">${(w.srcLang || "?").toUpperCase()} → ${(w.tgtLang || "?").toUpperCase()}</div>
             </div>
             <button class="review-reveal-btn" id="revealBtn">▸ Pokaż odpowiedź</button>
             <div class="review-hint">Naciśnij <kbd>Spacja</kbd> aby odsłonić</div>`;
 
+        attachReviewSpeakHandlers(card);
         document
             .getElementById("revealBtn")
             .addEventListener("click", revealAnswer);
@@ -884,18 +930,43 @@ function revealAnswer() {
 function renderAnswer(w) {
     const card = document.getElementById("reviewCard");
     const sr = w.sr || { step: 0, interval: 0 };
+    const srcL = w.srcLang || "en";
+    const tgtL = w.tgtLang || "pl";
 
     // Preview labels for each grade
     const labels = [1, 2, 3, 4, 5].map((g) => previewLabel(sr, g));
 
     card.innerHTML = `
         <div class="review-question">
-            <div class="review-word">${escapeHtml(w.original)}</div>
-            ${w.sentence ? `<div class="review-context">${escapeHtml(w.sentence)}</div>` : ""}
+            <div class="review-word-row">
+                <span class="review-word">${escapeHtml(w.original)}</span>
+                <button class="review-speak-btn" data-text="${escapeAttr(w.original)}" data-lang="${escapeAttr(srcL)}" title="Odczytaj">${SPEAK_SVG}</button>
+            </div>
+            ${
+                w.sentence
+                    ? `
+            <div class="review-context-row">
+                <span class="review-context">"${escapeHtml(w.sentence)}"</span>
+                <button class="review-speak-btn review-speak-sm" data-text="${escapeAttr(w.sentence)}" data-lang="${escapeAttr(srcL)}" title="Odczytaj zdanie">${SPEAK_SVG}</button>
+            </div>`
+                    : ""
+            }
         </div>
         <div class="review-answer">
-            <div class="review-translation">${escapeHtml(w.translated)}</div>
-            ${w.sentenceTranslated ? `<div class="review-sentence-trans">${escapeHtml(w.sentenceTranslated)}</div>` : ""}
+            <div class="review-translation-row">
+                <span class="review-translation">${escapeHtml(w.translated)}</span>
+                <button class="review-speak-btn" data-text="${escapeAttr(w.translated)}" data-lang="${escapeAttr(tgtL)}" title="Odczytaj tłumaczenie">${SPEAK_SVG}</button>
+            </div>
+            ${
+                w.sentenceTranslated
+                    ? `
+            <div class="review-divider"></div>
+            <div class="review-sentence-trans-row">
+                <span class="review-sentence-trans">"${escapeHtml(w.sentenceTranslated)}"</span>
+                <button class="review-speak-btn review-speak-sm" data-text="${escapeAttr(w.sentenceTranslated)}" data-lang="${escapeAttr(tgtL)}" title="Odczytaj tłumaczenie zdania">${SPEAK_SVG}</button>
+            </div>`
+                    : ""
+            }
         </div>
         <div class="review-rating">
             <div class="review-rating-label">Jak dobrze znałeś?</div>
@@ -928,6 +999,9 @@ function renderAnswer(w) {
             </div>
             <div class="review-hint">Klawisze <kbd>1</kbd>-<kbd>5</kbd> = ocena</div>
         </div>`;
+
+    // Attach TTS handlers
+    attachReviewSpeakHandlers(card);
 
     // Attach rating handlers
     card.querySelectorAll(".review-rate-btn").forEach((btn) => {
