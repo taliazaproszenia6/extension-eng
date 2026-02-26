@@ -777,6 +777,12 @@ function ensureSR(word) {
 //                      "reverse" = show translation, guess original
 let reviewDirection = "normal";
 
+// Load saved direction from storage
+chrome.storage.sync.get({ reviewDirection: "normal" }, (data) => {
+    reviewDirection = data.reviewDirection;
+    updateDirBtnLabel();
+});
+
 // ── Direction toggle button ───────────────────────────────────────
 function updateDirBtnLabel() {
     const btn = document.getElementById("reviewDirBtn");
@@ -790,6 +796,7 @@ function updateDirBtnLabel() {
 
 document.getElementById("reviewDirBtn")?.addEventListener("click", () => {
     reviewDirection = reviewDirection === "normal" ? "reverse" : "normal";
+    chrome.storage.sync.set({ reviewDirection }, flashSaved);
     updateDirBtnLabel();
     // Restart current card without changing queue position
     reviewAnswerShown = false;
@@ -1256,6 +1263,9 @@ function rateWord(grade) {
     // Apply SR update
     w.sr = srUpdate(w.sr, grade);
 
+    // Track session attempts per word (max 3 views, then move on)
+    w._sessionAttempts = (w._sessionAttempts || 0) + 1;
+
     // Persist
     chrome.storage.local.get({ savedWords: [] }, (data) => {
         const words = data.savedWords || [];
@@ -1265,9 +1275,9 @@ function rateWord(grade) {
         if (idx !== -1) {
             words[idx].sr = w.sr;
             chrome.storage.local.set({ savedWords: words }, () => {
-                if (grade < 5) {
+                if (grade < 5 && w._sessionAttempts < 3) {
                     // Grades 1-4: re-insert word later in the queue
-                    // so it comes back again in this session
+                    // so it comes back again in this session (max 3 attempts)
                     reviewQueue.splice(reviewIndex, 1);
                     // Insert a few cards later (or at end if queue is short)
                     const insertAt = Math.min(
@@ -1278,7 +1288,7 @@ function rateWord(grade) {
                     // Don't increment reviewIndex – current index now has next word
                     reviewTotalDue = reviewQueue.length;
                 } else {
-                    // Grade 5: word is done, advance
+                    // Grade 5 or max attempts reached: word is done, advance
                     reviewIndex++;
                 }
                 reviewAnswerShown = false;

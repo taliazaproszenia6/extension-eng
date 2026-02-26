@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,
-    "name": "Quick Translator & Reader",
+    "name": "Language Translator & Reader",
     "version": "2.0.0",
     "description": "Select any word or sentence, click the translate icon, and get an instant translation. Choose your target language in the popup.",
     "permissions": ["storage", "alarms", "notifications"],
@@ -9,7 +9,7 @@
     },
     "action": {
         "default_popup": "popup.html",
-        "default_title": "Quick Translator & Reader - Settings"
+        "default_title": "Language Translator & Reader - Settings"
     },
     "icons": {
         "48": "icon48.png",
