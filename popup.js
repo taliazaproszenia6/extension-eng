@@ -825,32 +825,145 @@ initReviewBadge();
 // ── SVG icons for review TTS buttons ──────────────────────────────
 const SPEAK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
 
-// ── TTS for popup (uses browser SpeechSynthesis) ──────────────────
+// ── TTS for popup (respects user settings: Browser / ElevenLabs) ──
+let popupElAudio = null;
+
+function cleanTextForPopupTTS(text) {
+    return text
+        .replace(/#/g, "")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+}
+
+function pickPopupVoice(savedVoiceName, lang) {
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+    if (savedVoiceName) {
+        const exact = voices.find((v) => v.name === savedVoiceName);
+        if (exact) return exact;
+    }
+    const baseLang = (lang || "en").split("-")[0].toLowerCase();
+    const langVoices = voices.filter((v) =>
+        v.lang.toLowerCase().startsWith(baseLang),
+    );
+    if (!langVoices.length) return null;
+    const patterns = [
+        /microsoft\s+(aria|jenny).*natural/i,
+        /microsoft\s+(aria|jenny)/i,
+        /natural/i,
+        /neural/i,
+        /online/i,
+        /enhanced/i,
+        /premium/i,
+        /microsoft.*(guy|ana|christopher|eric|michelle|steffan)/i,
+        /google\s+u[sk]/i,
+        /google/i,
+    ];
+    for (const p of patterns) {
+        const m = langVoices.find((v) => p.test(v.name));
+        if (m) return m;
+    }
+    return langVoices.find((v) => !v.localService) || langVoices[0];
+}
+
+/**
+ * Speak text using the same engine & voice configured in settings.
+ * Returns a Promise that resolves with { type: 'utter'|'audio', obj } for end-tracking.
+ */
 function popupSpeak(text, lang) {
     window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = lang || "en";
-    utter.rate = 0.9;
-    // Try to pick a good voice
-    const voices = window.speechSynthesis.getVoices();
-    const baseLang = (lang || "en").split("-")[0].toLowerCase();
-    const match = voices.find((v) => v.lang.toLowerCase().startsWith(baseLang));
-    if (match) utter.voice = match;
-    window.speechSynthesis.speak(utter);
-    return utter;
+    if (popupElAudio) {
+        popupElAudio.pause();
+        popupElAudio = null;
+    }
+
+    return new Promise((resolve) => {
+        chrome.storage.sync.get(
+            {
+                ttsMode: "browser",
+                elApiKey: "",
+                elVoiceId: "",
+                speechVoice: "",
+                speechRate: 0.95,
+            },
+            async (data) => {
+                // ElevenLabs path
+                if (
+                    data.ttsMode === "elevenlabs" &&
+                    data.elApiKey &&
+                    data.elVoiceId
+                ) {
+                    try {
+                        const res = await fetch(
+                            `https://api.elevenlabs.io/v1/text-to-speech/${data.elVoiceId}`,
+                            {
+                                method: "POST",
+                                headers: {
+                                    "xi-api-key": data.elApiKey,
+                                    "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                    text: cleanTextForPopupTTS(text),
+                                    model_id: "eleven_multilingual_v2",
+                                    voice_settings: {
+                                        stability: 0.5,
+                                        similarity_boost: 0.75,
+                                    },
+                                }),
+                            },
+                        );
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        popupElAudio = new Audio(url);
+                        popupElAudio.play();
+                        resolve({ type: "audio", obj: popupElAudio });
+                    } catch (err) {
+                        console.warn("[QT] ElevenLabs popup TTS failed:", err);
+                        resolve({ type: "none", obj: null });
+                    }
+                    return;
+                }
+                // Browser SpeechSynthesis path
+                const utter = new SpeechSynthesisUtterance(
+                    cleanTextForPopupTTS(text),
+                );
+                utter.lang = lang || "en";
+                utter.rate = data.speechRate;
+                const voice = pickPopupVoice(data.speechVoice, lang);
+                if (voice) utter.voice = voice;
+                window.speechSynthesis.speak(utter);
+                resolve({ type: "utter", obj: utter });
+            },
+        );
+    });
 }
 
 // ── Attach TTS handlers to all .review-speak-btn in card ──────────
 function attachReviewSpeakHandlers(card) {
     card.querySelectorAll(".review-speak-btn").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
+        btn.addEventListener("click", async (e) => {
             e.stopPropagation();
             btn.classList.add("speaking");
-            const utter = popupSpeak(btn.dataset.text, btn.dataset.lang);
             const done = () => btn.classList.remove("speaking");
-            utter.onend = done;
-            utter.onerror = done;
-            setTimeout(done, 5000); // safety fallback
+            try {
+                const result = await popupSpeak(
+                    btn.dataset.text,
+                    btn.dataset.lang,
+                );
+                if (result.type === "utter") {
+                    result.obj.onend = done;
+                    result.obj.onerror = done;
+                } else if (result.type === "audio") {
+                    result.obj.onended = done;
+                    result.obj.onerror = done;
+                } else {
+                    done();
+                }
+            } catch {
+                done();
+            }
+            setTimeout(done, 8000); // safety fallback
         });
     });
 }
