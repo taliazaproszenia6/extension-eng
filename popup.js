@@ -773,6 +773,29 @@ function ensureSR(word) {
     return word;
 }
 
+// ── Review direction: "normal" = show original, guess translation
+//                      "reverse" = show translation, guess original
+let reviewDirection = "normal";
+
+// ── Direction toggle button ───────────────────────────────────────
+function updateDirBtnLabel() {
+    const btn = document.getElementById("reviewDirBtn");
+    if (!btn) return;
+    if (reviewDirection === "normal") {
+        btn.innerHTML = 'EN <span class="dir-arrow">→</span> PL';
+    } else {
+        btn.innerHTML = 'PL <span class="dir-arrow">→</span> EN';
+    }
+}
+
+document.getElementById("reviewDirBtn")?.addEventListener("click", () => {
+    reviewDirection = reviewDirection === "normal" ? "reverse" : "normal";
+    updateDirBtnLabel();
+    // Restart current card without changing queue position
+    reviewAnswerShown = false;
+    renderReview();
+});
+
 // ── Load due reviews ──────────────────────────────────────────────
 function loadReviewQueue() {
     chrome.storage.local.get({ savedWords: [] }, (data) => {
@@ -1008,22 +1031,32 @@ function renderReview() {
 
     if (!reviewAnswerShown) {
         const srcL = w.srcLang || "en";
+        const tgtL = w.tgtLang || "pl";
+        const isReverse = reviewDirection === "reverse";
+        const showWord = isReverse ? w.translated : w.original;
+        const showLang = isReverse ? tgtL : srcL;
+        const showSentence = isReverse
+            ? w.sentenceTranslated || ""
+            : w.sentence || "";
+        const dirLabel = isReverse
+            ? `${(w.tgtLang || "?").toUpperCase()} → ${(w.srcLang || "?").toUpperCase()}`
+            : `${(w.srcLang || "?").toUpperCase()} → ${(w.tgtLang || "?").toUpperCase()}`;
         card.innerHTML = `
             <div class="review-question">
                 <div class="review-word-row">
-                    <span class="review-word">${escapeHtml(w.original)}</span>
-                    <button class="review-speak-btn" data-text="${escapeAttr(w.original)}" data-lang="${escapeAttr(srcL)}" title="Odczytaj">${SPEAK_SVG}</button>
+                    <span class="review-word">${escapeHtml(showWord)}</span>
+                    <button class="review-speak-btn" data-text="${escapeAttr(showWord)}" data-lang="${escapeAttr(showLang)}" title="Odczytaj">${SPEAK_SVG}</button>
                 </div>
                 ${
-                    w.sentence
+                    showSentence
                         ? `
                 <div class="review-context-row">
-                    <span class="review-context">"${escapeHtml(w.sentence)}"</span>
-                    <button class="review-speak-btn review-speak-sm" data-text="${escapeAttr(w.sentence)}" data-lang="${escapeAttr(srcL)}" title="Odczytaj zdanie">${SPEAK_SVG}</button>
+                    <span class="review-context">"${escapeHtml(showSentence)}"</span>
+                    <button class="review-speak-btn review-speak-sm" data-text="${escapeAttr(showSentence)}" data-lang="${escapeAttr(showLang)}" title="Odczytaj zdanie">${SPEAK_SVG}</button>
                 </div>`
                         : ""
                 }
-                <div class="review-meta">${(w.srcLang || "?").toUpperCase()} → ${(w.tgtLang || "?").toUpperCase()}</div>
+                <div class="review-meta">${dirLabel}</div>
             </div>
             <button class="review-reveal-btn" id="revealBtn">▸ Pokaż odpowiedź</button>
             <div class="review-hint">Naciśnij <kbd>Spacja</kbd> aby odsłonić</div>`;
@@ -1047,6 +1080,15 @@ function renderAnswer(w) {
     const sr = w.sr || { step: 0, interval: 0 };
     const srcL = w.srcLang || "en";
     const tgtL = w.tgtLang || "pl";
+    const isReverse = reviewDirection === "reverse";
+
+    // In reverse mode: question=translated, answer=original
+    const qWord = isReverse ? w.translated : w.original;
+    const qLang = isReverse ? tgtL : srcL;
+    const qSentence = isReverse ? w.sentenceTranslated || "" : w.sentence || "";
+    const aWord = isReverse ? w.original : w.translated;
+    const aLang = isReverse ? srcL : tgtL;
+    const aSentence = isReverse ? w.sentence || "" : w.sentenceTranslated || "";
 
     // Preview labels for each grade
     const labels = [1, 2, 3, 4, 5].map((g) => previewLabel(sr, g));
@@ -1054,31 +1096,31 @@ function renderAnswer(w) {
     card.innerHTML = `
         <div class="review-question">
             <div class="review-word-row">
-                <span class="review-word">${escapeHtml(w.original)}</span>
-                <button class="review-speak-btn" data-text="${escapeAttr(w.original)}" data-lang="${escapeAttr(srcL)}" title="Odczytaj">${SPEAK_SVG}</button>
+                <span class="review-word">${escapeHtml(qWord)}</span>
+                <button class="review-speak-btn" data-text="${escapeAttr(qWord)}" data-lang="${escapeAttr(qLang)}" title="Odczytaj">${SPEAK_SVG}</button>
             </div>
             ${
-                w.sentence
+                qSentence
                     ? `
             <div class="review-context-row">
-                <span class="review-context">"${escapeHtml(w.sentence)}"</span>
-                <button class="review-speak-btn review-speak-sm" data-text="${escapeAttr(w.sentence)}" data-lang="${escapeAttr(srcL)}" title="Odczytaj zdanie">${SPEAK_SVG}</button>
+                <span class="review-context">"${escapeHtml(qSentence)}"</span>
+                <button class="review-speak-btn review-speak-sm" data-text="${escapeAttr(qSentence)}" data-lang="${escapeAttr(qLang)}" title="Odczytaj zdanie">${SPEAK_SVG}</button>
             </div>`
                     : ""
             }
         </div>
         <div class="review-answer">
             <div class="review-translation-row">
-                <span class="review-translation">${escapeHtml(w.translated)}</span>
-                <button class="review-speak-btn" data-text="${escapeAttr(w.translated)}" data-lang="${escapeAttr(tgtL)}" title="Odczytaj tłumaczenie">${SPEAK_SVG}</button>
+                <span class="review-translation">${escapeHtml(aWord)}</span>
+                <button class="review-speak-btn" data-text="${escapeAttr(aWord)}" data-lang="${escapeAttr(aLang)}" title="Odczytaj tłumaczenie">${SPEAK_SVG}</button>
             </div>
             ${
-                w.sentenceTranslated
+                aSentence
                     ? `
             <div class="review-divider"></div>
             <div class="review-sentence-trans-row">
-                <span class="review-sentence-trans">"${escapeHtml(w.sentenceTranslated)}"</span>
-                <button class="review-speak-btn review-speak-sm" data-text="${escapeAttr(w.sentenceTranslated)}" data-lang="${escapeAttr(tgtL)}" title="Odczytaj tłumaczenie zdania">${SPEAK_SVG}</button>
+                <span class="review-sentence-trans">"${escapeHtml(aSentence)}"</span>
+                <button class="review-speak-btn review-speak-sm" data-text="${escapeAttr(aSentence)}" data-lang="${escapeAttr(aLang)}" title="Odczytaj tłumaczenie zdania">${SPEAK_SVG}</button>
             </div>`
                     : ""
             }
@@ -1113,7 +1155,8 @@ function renderAnswer(w) {
                 </button>
             </div>
             <div class="review-hint">Klawisze <kbd>1</kbd>-<kbd>5</kbd> = ocena</div>
-        </div>`;
+        </div>
+        <button class="review-edit-btn" id="reviewEditBtn">✏️ Edytuj</button>`;
 
     // Attach TTS handlers
     attachReviewSpeakHandlers(card);
@@ -1124,6 +1167,85 @@ function renderAnswer(w) {
             rateWord(parseInt(btn.dataset.grade));
         });
     });
+
+    // Edit button
+    document.getElementById("reviewEditBtn").addEventListener("click", () => {
+        showReviewEditForm(w);
+    });
+}
+
+// ── Edit form in review ───────────────────────────────────────────
+function showReviewEditForm(w) {
+    const card = document.getElementById("reviewCard");
+    card.innerHTML = `
+        <div class="review-edit-form">
+            <label>Oryginał</label>
+            <input type="text" id="editOriginal" value="${escapeAttr(w.original)}">
+            <label>Tłumaczenie</label>
+            <input type="text" id="editTranslated" value="${escapeAttr(w.translated)}">
+            <label>Zdanie (oryginał)</label>
+            <input type="text" id="editSentence" value="${escapeAttr(w.sentence || "")}">
+            <label>Zdanie (tłumaczenie)</label>
+            <input type="text" id="editSentenceTr" value="${escapeAttr(w.sentenceTranslated || "")}">
+            <div class="review-edit-actions">
+                <button class="review-edit-cancel" id="editCancel">Anuluj</button>
+                <button class="review-edit-save" id="editSave">💾 Zapisz</button>
+            </div>
+        </div>`;
+
+    document.getElementById("editCancel").addEventListener("click", () => {
+        renderAnswer(w);
+    });
+
+    document.getElementById("editSave").addEventListener("click", () => {
+        const newOriginal = document
+            .getElementById("editOriginal")
+            .value.trim();
+        const newTranslated = document
+            .getElementById("editTranslated")
+            .value.trim();
+        const newSentence = document
+            .getElementById("editSentence")
+            .value.trim();
+        const newSentenceTr = document
+            .getElementById("editSentenceTr")
+            .value.trim();
+        if (!newOriginal || !newTranslated) return;
+
+        // Keep old keys for finding in storage
+        const oldOriginal = w.original;
+        const oldTranslated = w.translated;
+
+        // Update queue object in-place
+        w.original = newOriginal;
+        w.translated = newTranslated;
+        w.sentence = newSentence;
+        w.sentenceTranslated = newSentenceTr;
+
+        // Persist to storage (updates word list too)
+        chrome.storage.local.get({ savedWords: [] }, (data) => {
+            const words = data.savedWords || [];
+            const idx = words.findIndex(
+                (x) =>
+                    x.original === oldOriginal &&
+                    x.translated === oldTranslated,
+            );
+            if (idx !== -1) {
+                words[idx].original = newOriginal;
+                words[idx].translated = newTranslated;
+                words[idx].sentence = newSentence;
+                words[idx].sentenceTranslated = newSentenceTr;
+                chrome.storage.local.set({ savedWords: words }, () => {
+                    renderAnswer(w);
+                });
+            } else {
+                renderAnswer(w);
+            }
+        });
+    });
+
+    // Focus first field
+    document.getElementById("editOriginal").focus();
 }
 
 // ── Rate word & update storage ────────────────────────────────────
