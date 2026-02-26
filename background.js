@@ -186,9 +186,9 @@ async function updateBadge() {
             chrome.action.setBadgeBackgroundColor({ color: "#4a6cf7" });
         } else {
             chrome.action.setBadgeText({ text: "" });
-            // Schedule alarm for the next word that becomes due
-            scheduleNextDueAlarm(words, now);
         }
+        // Always schedule alarm for the next word that becomes due
+        scheduleNextDueAlarm(words, now);
     } catch (err) {
         console.warn("[QT] Badge update error:", err);
     }
@@ -244,9 +244,41 @@ async function checkAndNotify() {
 chrome.alarms.create("updateBadge", { periodInMinutes: 5 });
 chrome.alarms.create("reviewNotification", { periodInMinutes: 360 }); // every 6h
 
-chrome.alarms.onAlarm.addListener((alarm) => {
+/** Notify all tabs that reviews just became due */
+async function notifyTabsReviewDue(dueCount) {
+    try {
+        const tabs = await chrome.tabs.query({});
+        for (const tab of tabs) {
+            if (tab.id) {
+                chrome.tabs
+                    .sendMessage(tab.id, {
+                        type: "QT_REVIEW_DUE",
+                        count: dueCount,
+                    })
+                    .catch(() => {}); // tab may not have content script
+            }
+        }
+    } catch (e) {
+        // ignore
+    }
+}
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name === "updateBadge") updateBadge();
-    if (alarm.name === "nextDueReview") updateBadge(); // precise trigger
+    if (alarm.name === "nextDueReview") {
+        // This alarm fires exactly when a review becomes due
+        const data = await chrome.storage.local.get({ savedWords: [] });
+        const words = data.savedWords || [];
+        const now = Date.now();
+        const dueCount = words.filter((w) => {
+            if (!w.sr) return false; // new words without SR – don't notify
+            return w.sr.nextReview <= now;
+        }).length;
+        if (dueCount > 0) {
+            notifyTabsReviewDue(dueCount);
+        }
+        updateBadge();
+    }
     if (alarm.name === "reviewNotification") checkAndNotify();
 });
 

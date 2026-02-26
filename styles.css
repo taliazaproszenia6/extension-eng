@@ -8,6 +8,52 @@
    Icon Toolbar (translate + read buttons)
    ═══════════════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════════════
+   Review-due toast notification
+   ═══════════════════════════════════════════════════════════════ */
+
+#__qt_review_toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 2147483647;
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    border-radius: 14px;
+    background: rgba(15, 15, 35, 0.85);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.3),
+        0 0 0 1px rgba(129, 140, 248, 0.2) inset;
+    border: 1px solid rgba(129, 140, 248, 0.25);
+    color: rgba(255, 255, 255, 0.92);
+    font-family:
+        "Inter",
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+    transition:
+        opacity 0.35s ease,
+        transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+}
+
+#__qt_review_toast.__qt_toast_visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
 #__qt_icon {
     position: absolute;
     z-index: 2147483647;

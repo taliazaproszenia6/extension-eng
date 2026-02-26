@@ -29,6 +29,28 @@ const voiceSelect = document.getElementById("voiceSelect");
 const rateRange = document.getElementById("rateRange");
 const rateValue = document.getElementById("rateValue");
 
+// ── Auto-switch to Review tab if there are due reviews ────────────
+chrome.storage.local.get({ savedWords: [] }, (data) => {
+    const words = data.savedWords || [];
+    const now = Date.now();
+    const dueCount = words.filter((w) => {
+        if (!w.sr) return true;
+        return w.sr.nextReview <= now;
+    }).length;
+    if (dueCount > 0) {
+        document
+            .querySelectorAll(".tab")
+            .forEach((t) => t.classList.remove("active"));
+        document
+            .querySelectorAll(".tab-content")
+            .forEach((c) => c.classList.remove("active"));
+        const reviewTab = document.querySelector('.tab[data-tab="review"]');
+        if (reviewTab) reviewTab.classList.add("active");
+        document.getElementById("tab-review")?.classList.add("active");
+        loadReviewQueue();
+    }
+});
+
 // ── Flash saved message ───────────────────────────────────────────
 function flashSaved() {
     savedMsg.classList.add("show");
@@ -642,8 +664,8 @@ function escapeAttr(str) {
 //  SPACED REPETITION  –  Step-based intervals (1d→3d→7d→14d→30d→90d)
 // ═══════════════════════════════════════════════════════════════════
 
-// ── Interval steps (in days): 1d → 3d → 7d → 14d → 30d → 90d ────
-const SR_STEPS = [1, 3, 7, 14, 30, 90];
+// ── Interval steps (in days): 12h → 3d → 7d → 14d → 30d → 90d ──
+const SR_STEPS = [0.5, 3, 7, 14, 30, 90];
 
 // ── In-session delays (in minutes) for grades 1-4 ────────────────
 const SESSION_DELAYS = {
@@ -668,9 +690,9 @@ function srUpdate(sr, grade) {
     let step = sr.step;
 
     if (grade === 5) {
-        // Advance to next long-term step
-        step = step + 1;
+        // Use current step for interval, then advance for next time
         const intervalDays = getIntervalForStep(step);
+        step = step + 1;
         return {
             step,
             interval: intervalDays,
@@ -709,7 +731,7 @@ function getIntervalForStep(step) {
 /** Preview what the next review time label will be for a given grade */
 function previewLabel(sr, grade) {
     if (grade === 5) {
-        const step = sr.step + 1;
+        const step = sr.step; // current step (not +1, interval is taken before advancing)
         const days = getIntervalForStep(step);
         return formatIntervalDays(days);
     }
@@ -718,6 +740,10 @@ function previewLabel(sr, grade) {
 }
 
 function formatIntervalDays(days) {
+    if (days < 1) {
+        const h = Math.round(days * 24);
+        return `${h}h`;
+    }
     if (days <= 1) return "1 dzień";
     if (days < 7) return `${days} dni`;
     if (days === 7) return "1 tydz.";
@@ -1026,7 +1052,7 @@ function renderReview() {
             <div class="review-done">
                 <div class="review-done-icon">🎉</div>
                 <div class="review-done-text">Gratulacje!</div>
-                <div class="review-done-sub">Wykonałeś wszystkie ${reviewTotalDue} powtórek na dziś!</div>
+                <div class="review-done-sub">Wykonałeś wszystkie ${reviewTotalDue} powtórek na teraz!</div>
             </div>`;
         updateReviewTabBadge(0);
         return;

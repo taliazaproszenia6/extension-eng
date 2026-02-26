@@ -68,6 +68,37 @@
     const cleanupHandlers = [];
     const dismissHandlers = [];
 
+    // ── Review-due toast notification ──────────────────────────────
+    chrome.runtime.onMessage.addListener((msg) => {
+        if (msg.type === "QT_REVIEW_DUE" && msg.count > 0) {
+            showReviewDueToast(msg.count);
+        }
+    });
+
+    function showReviewDueToast(count) {
+        // Don't duplicate
+        const existing = document.getElementById(PREFIX + "review_toast");
+        if (existing) existing.remove();
+
+        const toast = document.createElement("div");
+        toast.id = PREFIX + "review_toast";
+        toast.innerHTML = `<span style="margin-right:6px">🧠</span> ${count === 1 ? "Pojawiła się powtórka!" : `Pojawiły się ${count} powtórki!`}`;
+        document.body.appendChild(toast);
+
+        // Trigger enter animation
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                toast.classList.add(PREFIX + "toast_visible");
+            });
+        });
+
+        // Auto-dismiss after 4s
+        setTimeout(() => {
+            toast.classList.remove(PREFIX + "toast_visible");
+            setTimeout(() => toast.remove(), 400);
+        }, 4000);
+    }
+
     document.addEventListener("mousemove", (e) => {
         lastMouseX = e.clientX;
         lastMouseY = e.clientY;
