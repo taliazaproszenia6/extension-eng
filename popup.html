@@ -1358,6 +1358,54 @@
             text-align: center;
             letter-spacing: .2px;
         }
+
+        /* ── Cloud Sync ── */
+        .sync-btn {
+            padding: 9px 16px;
+            font-size: 11.5px;
+            font-weight: 600;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+            background: var(--glass);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all .25s cubic-bezier(.4, 0, .2, 1);
+            font-family: inherit;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .sync-btn:hover {
+            background: var(--glass-hover);
+        }
+
+        .sync-btn:disabled {
+            opacity: 0.5;
+            cursor: default;
+        }
+
+        .sync-primary {
+            background: var(--accent-dim);
+            border-color: rgba(129, 140, 248, 0.2);
+            color: var(--accent);
+        }
+
+        .sync-primary:hover {
+            background: var(--accent-mid);
+            border-color: rgba(129, 140, 248, 0.4);
+            box-shadow: 0 4px 16px var(--accent-glow);
+        }
+
+        .sync-danger {
+            color: var(--text-ghost);
+            font-weight: 500;
+        }
+
+        .sync-danger:hover {
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.06);
+            border-color: rgba(248, 113, 113, 0.12);
+        }
     </style>
 </head>
 
@@ -1388,6 +1436,13 @@
     <!-- Settings Tab -->
     <div class="tab-content active" id="tab-settings">
         <div class="settings">
+            <!-- Cloud Sync -->
+            <div class="setting-group">
+                <label>☁️ synchronizacja</label>
+                <div class="glass-card">
+                    <div id="syncContent"></div>
+                </div>
+            </div>
             <div class="setting-group">
                 <label for="targetLang">Język docelowy</label>
                 <select id="targetLang">
@@ -1480,6 +1535,8 @@
                 </div>
             </div>
 
+
+
             <div class="saved-msg" id="saved">✓ Zapisano</div>
             <div class="tip">
                 💡 Zaznacz tekst na stronie → kliknij ikonę tłumaczenia → kliknij 🔖 aby zapisać słowo do kolekcji.
@@ -1535,6 +1592,8 @@
         </div>
     </div>
 
+    <script src="firebase-config.js"></script>
+    <script src="firebase-sync.js"></script>
     <script src="popup.js"></script>
 </body>
 

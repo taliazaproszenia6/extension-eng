@@ -1,7 +1,14 @@
 // background.js – Badge updates, review notifications & cross-device sync
 
+// ── Load Firebase modules (graceful fallback if missing) ──────────
+try {
+    importScripts("firebase-config.js", "firebase-sync.js");
+} catch (e) {
+    console.warn("[QT] Firebase modules not loaded:", e);
+}
+
 // ══════════════════════════════════════════════════════════════════
-//  Cross-device sync (chrome.storage.sync, chunked)
+//  Cross-device sync (chrome.storage.sync, chunked) – FALLBACK
 // ══════════════════════════════════════════════════════════════════
 const SYNC_CHUNK_MAX = 7000; // chars per chunk (under QUOTA_BYTES_PER_ITEM 8192)
 let _skipSyncPush = false; // flag to prevent push→pull→push loop
@@ -117,7 +124,21 @@ function mergeWords(localWords, syncWords) {
 let _pushTimer = null;
 function debouncedPushToSync(words) {
     clearTimeout(_pushTimer);
-    _pushTimer = setTimeout(() => pushWordsToSync(words), 2000);
+    _pushTimer = setTimeout(async () => {
+        // Prefer Firebase if configured and signed in
+        if (
+            typeof FirebaseSync !== "undefined" &&
+            FirebaseSync.isConfigured()
+        ) {
+            const user = await FirebaseSync.getUser();
+            if (user) {
+                firebasePushWords(words);
+                return;
+            }
+        }
+        // Fallback to chrome.storage.sync
+        pushWordsToSync(words);
+    }, 2000);
 }
 
 /** Handle incoming sync changes from another device */
@@ -148,6 +169,16 @@ async function onSyncChanged(changes) {
 //  Initial sync on startup
 // ══════════════════════════════════════════════════════════════════
 async function initialSync() {
+    // Try Firebase first
+    if (typeof FirebaseSync !== "undefined" && FirebaseSync.isConfigured()) {
+        const user = await FirebaseSync.getUser();
+        if (user) {
+            await firebaseFullSync();
+            return;
+        }
+    }
+
+    // Fallback: chrome.storage.sync (chunked)
     const syncWords = await pullWordsFromSync();
     const localData = await chrome.storage.local.get({ savedWords: [] });
     const localWords = localData.savedWords || [];
@@ -163,8 +194,128 @@ async function initialSync() {
             _skipSyncPush = false;
         }
     } else if (localWords.length > 0) {
-        // No sync data yet – push local words for the first time
         await pushWordsToSync(localWords);
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  Firebase Firestore sync
+// ══════════════════════════════════════════════════════════════════
+
+/** Full two-way sync with Firestore */
+async function firebaseFullSync() {
+    if (typeof FirebaseSync === "undefined" || !FirebaseSync.isConfigured())
+        return;
+    const user = await FirebaseSync.getUser();
+    if (!user) return;
+    const token = await FirebaseSync.getValidToken();
+    if (!token) return;
+
+    try {
+        const remoteWords = await FirebaseSync.pullWords(user.uid, token);
+        if (!remoteWords) return; // pull failed
+
+        const localData = await chrome.storage.local.get({ savedWords: [] });
+        const localWords = localData.savedWords || [];
+
+        // Build maps for merge
+        const localMap = new Map();
+        for (const w of localWords) localMap.set(FirebaseSync.wordKey(w), w);
+
+        const remoteMap = new Map();
+        for (const w of remoteWords) remoteMap.set(FirebaseSync.wordKey(w), w);
+
+        const allKeys = new Set([...localMap.keys(), ...remoteMap.keys()]);
+        const merged = [];
+        const toPush = [];
+
+        for (const key of allKeys) {
+            const local = localMap.get(key);
+            const remote = remoteMap.get(key);
+
+            if (local && !remote) {
+                merged.push(local);
+                toPush.push(local);
+            } else if (!local && remote) {
+                merged.push(remote);
+            } else {
+                // Both exist – keep whichever was updated more recently
+                const lt =
+                    local.updatedAt ||
+                    local.sr?.lastReview ||
+                    local.timestamp ||
+                    0;
+                const rt =
+                    remote.updatedAt ||
+                    remote.sr?.lastReview ||
+                    remote.timestamp ||
+                    0;
+                if (lt >= rt) {
+                    merged.push(local);
+                    if (lt > rt) toPush.push(local);
+                } else {
+                    merged.push(remote);
+                }
+            }
+        }
+
+        // Update local storage if anything changed
+        const localChanged =
+            merged.length !== localWords.length ||
+            JSON.stringify(merged) !== JSON.stringify(localWords);
+
+        if (localChanged) {
+            _skipSyncPush = true;
+            await chrome.storage.local.set({ savedWords: merged });
+            _skipSyncPush = false;
+        }
+
+        // Push local-only / updated words to Firestore
+        if (toPush.length > 0) {
+            await FirebaseSync.pushWords(user.uid, token, toPush);
+        }
+
+        // Store last sync timestamp
+        await chrome.storage.local.set({
+            lastFirebaseSync: Date.now(),
+        });
+    } catch (err) {
+        console.warn("[QT] Firebase full sync error:", err);
+    }
+}
+
+/** Push all words to Firestore */
+async function firebasePushWords(words) {
+    if (typeof FirebaseSync === "undefined" || !FirebaseSync.isConfigured())
+        return;
+    const user = await FirebaseSync.getUser();
+    if (!user) return;
+    const token = await FirebaseSync.getValidToken();
+    if (!token) return;
+
+    try {
+        await FirebaseSync.pushWords(user.uid, token, words);
+        await chrome.storage.local.set({
+            lastFirebaseSync: Date.now(),
+        });
+    } catch (err) {
+        console.warn("[QT] Firebase push error:", err);
+    }
+}
+
+/** Delete a single word from Firestore */
+async function firebaseDeleteWord(word) {
+    if (typeof FirebaseSync === "undefined" || !FirebaseSync.isConfigured())
+        return;
+    const user = await FirebaseSync.getUser();
+    if (!user) return;
+    const token = await FirebaseSync.getValidToken();
+    if (!token) return;
+
+    try {
+        await FirebaseSync.deleteWordDoc(user.uid, token, word);
+    } catch (err) {
+        console.warn("[QT] Firebase delete error:", err);
     }
 }
 
@@ -243,6 +394,7 @@ async function checkAndNotify() {
 // ── Alarms ────────────────────────────────────────────────────────
 chrome.alarms.create("updateBadge", { periodInMinutes: 5 });
 chrome.alarms.create("reviewNotification", { periodInMinutes: 360 }); // every 6h
+chrome.alarms.create("firestoreSync", { periodInMinutes: 5 }); // periodic Firestore pull
 
 /** Notify all tabs that reviews just became due */
 async function notifyTabsReviewDue(dueCount) {
@@ -265,6 +417,7 @@ async function notifyTabsReviewDue(dueCount) {
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name === "updateBadge") updateBadge();
+    if (alarm.name === "firestoreSync") firebaseFullSync();
     if (alarm.name === "nextDueReview") {
         // This alarm fires exactly when a review becomes due
         const data = await chrome.storage.local.get({ savedWords: [] });
@@ -300,7 +453,57 @@ chrome.storage.onChanged.addListener((changes, area) => {
             debouncedPushToSync(newWords);
         }
     }
+    if (area === "local" && changes.firebaseAuth) {
+        // User just logged in → trigger full sync
+        const auth = changes.firebaseAuth?.newValue;
+        if (auth?.uid) {
+            setTimeout(() => firebaseFullSync(), 500);
+        }
+    }
     if (area === "sync") {
-        onSyncChanged(changes);
+        // Only use chrome.storage.sync fallback when not on Firebase
+        if (
+            typeof FirebaseSync !== "undefined" &&
+            FirebaseSync.isConfigured()
+        ) {
+            FirebaseSync.getUser().then((user) => {
+                if (!user) onSyncChanged(changes);
+            });
+        } else {
+            onSyncChanged(changes);
+        }
+    }
+});
+
+// ── Message handling (popup commands) ─────────────────────────────
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === "QT_FIREBASE_SIGN_IN") {
+        // Run sign-in in service worker so popup closing doesn't kill the flow
+        FirebaseSync.signIn()
+            .then((auth) => {
+                sendResponse({ ok: true, email: auth.email || "" });
+                // Full sync right after sign-in
+                firebaseFullSync();
+            })
+            .catch((e) => sendResponse({ error: e.message }));
+        return true; // async response
+    }
+    if (msg.type === "QT_FIREBASE_SIGN_OUT") {
+        FirebaseSync.signOut()
+            .then(() => sendResponse({ ok: true }))
+            .catch((e) => sendResponse({ error: e.message }));
+        return true;
+    }
+    if (msg.type === "QT_FIREBASE_SYNC") {
+        firebaseFullSync()
+            .then(() => sendResponse({ ok: true }))
+            .catch((e) => sendResponse({ error: e.message }));
+        return true; // async response
+    }
+    if (msg.type === "QT_FIRESTORE_DELETE" && msg.word) {
+        firebaseDeleteWord(msg.word)
+            .then(() => sendResponse({ ok: true }))
+            .catch((e) => sendResponse({ error: e.message }));
+        return true; // keep service worker alive until delete completes
     }
 });

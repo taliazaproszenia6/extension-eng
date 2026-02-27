@@ -496,6 +496,7 @@
                         lastReview: null,
                     };
                 }
+                entry.updatedAt = Date.now();
                 words.push(entry);
                 chrome.storage.local.set({ savedWords: words });
             }
