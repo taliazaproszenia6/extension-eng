@@ -680,18 +680,40 @@
                 html: el.innerHTML,
             }));
 
-            const wordHTML = translatedText
-                .split(/\s+/)
-                .map(
-                    (w, i) =>
-                        `<span class="${PREFIX}sub-word" style="animation-delay:${i * 0.07}s">${w}</span>`,
-                )
-                .join(" ");
+            const words = translatedText.split(/\s+/).filter(Boolean);
 
-            subEls.forEach((el, idx) => {
-                el.classList.add(PREFIX + "sub-translated");
-                el.innerHTML = idx === 0 ? wordHTML : "";
-            });
+            if (subEls.length === 1) {
+                // Single element – just set the text
+                subEls[0].classList.add(PREFIX + "sub-translated");
+                subEls[0].textContent = words.join(" ");
+            } else {
+                // Multiple subtitle elements – distribute words proportionally
+                const origLengths = subEls.map(
+                    (el) => el.textContent.trim().length || 1,
+                );
+                const totalOrigLen = origLengths.reduce((a, b) => a + b, 0);
+                const totalWords = words.length;
+                let wordIdx = 0;
+
+                subEls.forEach((el, i) => {
+                    el.classList.add(PREFIX + "sub-translated");
+                    if (i === subEls.length - 1) {
+                        // Last element gets remaining words
+                        el.textContent = words.slice(wordIdx).join(" ");
+                    } else {
+                        const share = Math.max(
+                            1,
+                            Math.round(
+                                (origLengths[i] / totalOrigLen) * totalWords,
+                            ),
+                        );
+                        el.textContent = words
+                            .slice(wordIdx, wordIdx + share)
+                            .join(" ");
+                        wordIdx += share;
+                    }
+                });
+            }
             eTranslateActive = true;
         }
 

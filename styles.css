@@ -707,21 +707,4 @@
     text-shadow: 0 0 8px rgba(78, 205, 196, 0.4) !important;
 }
 
-.__qt_sub-word {
-    display: inline;
-    opacity: 0;
-    animation: __qt_wordIn 0.25s ease forwards;
-}
-
-@keyframes __qt_wordIn {
-    from {
-        opacity: 0;
-        transform: translateY(4px);
-        filter: blur(2px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-        filter: blur(0);
-    }
-}
+/* word animation removed – translation appears instantly */
