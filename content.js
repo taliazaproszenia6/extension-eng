@@ -737,10 +737,10 @@
         function showSubLoading() {
             const overlay = createOverlay();
             overlay.innerHTML =
-                `<span class="${PREFIX}sub-dots">` +
-                `<span class="${PREFIX}dot"></span>` +
-                `<span class="${PREFIX}dot"></span>` +
-                `<span class="${PREFIX}dot"></span></span>`;
+                `<div class="${PREFIX}shimmer-bar">` +
+                `<div class="${PREFIX}shimmer-line"></div>` +
+                `<div class="${PREFIX}shimmer-line ${PREFIX}shimmer-short"></div>` +
+                `</div>`;
             positionOverlay();
         }
 
@@ -800,7 +800,48 @@
             removeOverlay();
             eOriginalContents = [];
             eTranslateActive = false;
+            // Stop any TTS that was reading the translated text
+            window.speechSynthesis.cancel();
+            const audio = getElAudioEl();
+            if (audio) {
+                audio.pause();
+                setElAudioEl(null);
+            }
         }
+
+        // CSS-based control-bar suppression: add __qt_hide-controls to .video-js
+        // so the control bar is hidden by CSS. Only mousemove temporarily removes it.
+        let _controlBarTimer = null;
+        function ensureControlsHidden() {
+            const vjsEl = document.querySelector(".video-js");
+            if (vjsEl && !vjsEl.classList.contains("__qt_hide-controls")) {
+                vjsEl.classList.add("__qt_hide-controls");
+            }
+        }
+        function initControlBarHide() {
+            const vjsEl = document.querySelector(".video-js");
+            if (!vjsEl || vjsEl.__qtMouseBound) return;
+            vjsEl.__qtMouseBound = true;
+            vjsEl.classList.add("__qt_hide-controls");
+            vjsEl.addEventListener("mousemove", () => {
+                vjsEl.classList.remove("__qt_hide-controls");
+                clearTimeout(_controlBarTimer);
+                _controlBarTimer = setTimeout(() => {
+                    vjsEl.classList.add("__qt_hide-controls");
+                }, 3000);
+            });
+            vjsEl.addEventListener("mouseleave", () => {
+                clearTimeout(_controlBarTimer);
+                vjsEl.classList.add("__qt_hide-controls");
+            });
+        }
+        initControlBarHide();
+        document.addEventListener("fullscreenchange", () =>
+            setTimeout(initControlBarHide, 200),
+        );
+        document.addEventListener("webkitfullscreenchange", () =>
+            setTimeout(initControlBarHide, 200),
+        );
 
         document.addEventListener(
             "keydown",
@@ -839,6 +880,11 @@
 
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
+
+                // Ensure control bar stays hidden on keyboard nav
+                ensureControlsHidden();
+                clearTimeout(_controlBarTimer);
 
                 // S / ArrowDown / E / Enter = toggle subtitle translation in-place
                 if (
@@ -888,25 +934,23 @@
                     showSubLoading();
 
                     if (subText) {
-                        // Speak original text if subtitleTTS is enabled
-                        if (chrome?.storage?.sync) {
-                            chrome.storage.sync.get(
-                                { subtitleTTS: false },
-                                (data) => {
-                                    if (data.subtitleTTS) {
-                                        const pageLang =
-                                            document.documentElement.lang ||
-                                            navigator.language ||
-                                            "en";
-                                        speak(subText, pageLang);
-                                    }
-                                },
-                            );
-                        }
                         // Text found – translate right away
                         getTargetLang().then((lang) =>
                             googleTranslate(subText, lang)
-                                .then((r) => applyTranslation(r.translated))
+                                .then((r) => {
+                                    applyTranslation(r.translated);
+                                    // Speak translated text if subtitleTTS is enabled
+                                    if (chrome?.storage?.sync) {
+                                        chrome.storage.sync.get(
+                                            { subtitleTTS: false },
+                                            (data) => {
+                                                if (data.subtitleTTS) {
+                                                    speak(r.translated, lang);
+                                                }
+                                            },
+                                        );
+                                    }
+                                })
                                 .catch(() => restoreOriginal()),
                         );
                     } else {

@@ -716,38 +716,48 @@
     white-space: pre-wrap;
 }
 
-.__qt_sub-dots {
-    display: inline-flex;
-    gap: 4px;
-    align-items: center;
-    justify-content: center;
+.__qt_shimmer-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px 0;
+    width: 100%;
 }
 
-.__qt_dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.85);
-    animation: __qt_dotPulse 1s ease-in-out infinite;
+.__qt_shimmer-line {
+    height: 14px;
+    width: 85%;
+    border-radius: 6px;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.06) 25%,
+        rgba(255, 255, 255, 0.18) 50%,
+        rgba(255, 255, 255, 0.06) 75%
+    );
+    background-size: 200% 100%;
+    animation: __qt_shimmer 1.4s ease-in-out infinite;
 }
 
-.__qt_dot:nth-child(2) {
-    animation-delay: 0.15s;
+.__qt_shimmer-short {
+    width: 55%;
 }
 
-.__qt_dot:nth-child(3) {
-    animation-delay: 0.3s;
-}
-
-@keyframes __qt_dotPulse {
-    0%,
-    80%,
+@keyframes __qt_shimmer {
+    0% {
+        background-position: 200% 0;
+    }
     100% {
-        opacity: 0.25;
-        transform: scale(0.8);
+        background-position: -200% 0;
     }
-    40% {
-        opacity: 1;
-        transform: scale(1.2);
-    }
+}
+
+/* Force-hide video.js control bar — only mouse movement removes this class */
+.video-js.__qt_hide-controls .vjs-control-bar {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+.video-js.__qt_hide-controls .vjs-title {
+    display: none !important;
 }
