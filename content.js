@@ -553,7 +553,7 @@
     // ═══════════════════════════════════════════════════════════════
 
     (function setupSubtitleNavigation() {
-        const FALLBACK_SKIP = 5;
+        const FALLBACK_SKIP = 3;
 
         function getActiveVideo() {
             const videos = document.querySelectorAll("video");
