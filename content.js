@@ -672,34 +672,107 @@
             return [];
         }
 
+        let translationOverlay = null;
+
+        function getSubtitleRect() {
+            const els = getSubtitleElements();
+            if (els.length === 0) return null;
+            let top = Infinity,
+                bottom = -Infinity,
+                left = Infinity,
+                right = -Infinity;
+            for (const el of els) {
+                const r = el.getBoundingClientRect();
+                if (r.width === 0 && r.height === 0) continue;
+                top = Math.min(top, r.top);
+                bottom = Math.max(bottom, r.bottom);
+                left = Math.min(left, r.left);
+                right = Math.max(right, r.right);
+            }
+            if (top === Infinity) return null;
+            return { top, bottom, left, right, width: right - left };
+        }
+
+        function createOverlay() {
+            removeOverlay();
+            translationOverlay = document.createElement("div");
+            translationOverlay.className = PREFIX + "sub-overlay";
+            // Use fullscreen-aware parent so overlay is visible in fullscreen
+            const parent =
+                document.fullscreenElement ||
+                document.webkitFullscreenElement ||
+                document.body;
+            parent.appendChild(translationOverlay);
+            return translationOverlay;
+        }
+
+        function removeOverlay() {
+            if (translationOverlay) {
+                translationOverlay.remove();
+                translationOverlay = null;
+            }
+        }
+
+        function positionOverlay() {
+            if (!translationOverlay) return;
+            const rect = getSubtitleRect();
+            if (!rect) return;
+
+            // Match subtitle font size
+            const subEls = getSubtitleElements();
+            if (subEls.length > 0) {
+                const cs = window.getComputedStyle(subEls[0]);
+                translationOverlay.style.fontSize = cs.fontSize;
+                translationOverlay.style.fontFamily = cs.fontFamily;
+            }
+
+            translationOverlay.style.position = "fixed";
+            translationOverlay.style.left = rect.left + "px";
+            translationOverlay.style.width = rect.width + "px";
+            // Measure after content + font are set
+            const overlayH = translationOverlay.offsetHeight || 40;
+            translationOverlay.style.top = rect.top - overlayH - 4 + "px";
+        }
+
+        function showSubLoading() {
+            const overlay = createOverlay();
+            overlay.innerHTML =
+                `<span class="${PREFIX}sub-dots">` +
+                `<span class="${PREFIX}dot"></span>` +
+                `<span class="${PREFIX}dot"></span>` +
+                `<span class="${PREFIX}dot"></span></span>`;
+            positionOverlay();
+        }
+
+        function clearSubLoading() {
+            // overlay will be replaced by translation or removed
+        }
+
         function applyTranslation(translatedText) {
             const subEls = getSubtitleElements();
-            if (subEls.length === 0) return;
-            eOriginalContents = subEls.map((el) => ({
-                el,
-                html: el.innerHTML,
-            }));
+            if (subEls.length === 0) {
+                removeOverlay();
+                return;
+            }
 
+            const overlay = translationOverlay || createOverlay();
             const words = translatedText.split(/\s+/).filter(Boolean);
 
-            if (subEls.length === 1) {
-                // Single element – just set the text
-                subEls[0].classList.add(PREFIX + "sub-translated");
-                subEls[0].textContent = words.join(" ");
+            if (subEls.length <= 1) {
+                overlay.textContent = words.join(" ");
             } else {
-                // Multiple subtitle elements – distribute words proportionally
+                // Distribute words proportionally across lines
                 const origLengths = subEls.map(
                     (el) => el.textContent.trim().length || 1,
                 );
                 const totalOrigLen = origLengths.reduce((a, b) => a + b, 0);
                 const totalWords = words.length;
                 let wordIdx = 0;
+                const lines = [];
 
                 subEls.forEach((el, i) => {
-                    el.classList.add(PREFIX + "sub-translated");
                     if (i === subEls.length - 1) {
-                        // Last element gets remaining words
-                        el.textContent = words.slice(wordIdx).join(" ");
+                        lines.push(words.slice(wordIdx).join(" "));
                     } else {
                         const share = Math.max(
                             1,
@@ -707,21 +780,24 @@
                                 (origLengths[i] / totalOrigLen) * totalWords,
                             ),
                         );
-                        el.textContent = words
-                            .slice(wordIdx, wordIdx + share)
-                            .join(" ");
+                        lines.push(
+                            words.slice(wordIdx, wordIdx + share).join(" "),
+                        );
                         wordIdx += share;
                     }
                 });
+
+                overlay.innerHTML = lines
+                    .map((line) => `<div>${line}</div>`)
+                    .join("");
             }
+
+            positionOverlay();
             eTranslateActive = true;
         }
 
         function restoreOriginal() {
-            for (const { el, html } of eOriginalContents) {
-                el.classList.remove(PREFIX + "sub-translated");
-                el.innerHTML = html;
-            }
+            removeOverlay();
             eOriginalContents = [];
             eTranslateActive = false;
         }
@@ -780,46 +856,73 @@
                         return;
                     }
 
-                    const immediateText = getCurrentSubtitleText(video);
+                    // Capture text IMMEDIATELY from all sources before anything else
                     const capturedTime = video.currentTime;
+                    let subText = getCurrentSubtitleText(video);
+
+                    // If DOM didn't have it, try textTracks cues right away
+                    if (!subText) {
+                        const cues = getAllCues(video);
+                        for (const cue of cues) {
+                            if (
+                                capturedTime >= cue.startTime - 0.5 &&
+                                capturedTime <= cue.endTime + 0.5
+                            ) {
+                                if (cue.text?.trim()) {
+                                    subText = cue.text.trim();
+                                    break;
+                                }
+                            }
+                        }
+                        if (!subText && cues.length > 0) {
+                            const idx = getCurrentCueIndex(cues, capturedTime);
+                            if (cues[idx]?.text?.trim())
+                                subText = cues[idx].text.trim();
+                        }
+                    }
+
                     eWasPlaying = !video.paused;
                     video.pause();
 
-                    function resolveSubtitleText() {
-                        if (immediateText) return immediateText;
-                        const post = getCurrentSubtitleText(video);
-                        if (post) return post;
-                        const cues = getAllCues(video);
-                        if (cues.length > 0) {
-                            for (const cue of cues) {
-                                if (
-                                    capturedTime >= cue.startTime - 0.1 &&
-                                    capturedTime <= cue.endTime + 0.1
-                                ) {
-                                    if (cue.text?.trim())
-                                        return cue.text.trim();
-                                }
-                            }
-                            const idx = getCurrentCueIndex(cues, capturedTime);
-                            if (cues[idx]?.text?.trim())
-                                return cues[idx].text.trim();
-                        }
-                        return null;
-                    }
+                    // Show loading immediately so user sees feedback
+                    showSubLoading();
 
-                    setTimeout(() => {
-                        const subText = resolveSubtitleText();
-                        if (!subText) {
-                            if (eWasPlaying) video.play();
-                            eWasPlaying = false;
-                            return;
-                        }
+                    if (subText) {
+                        // Text found – translate right away
                         getTargetLang().then((lang) =>
-                            googleTranslate(subText, lang).then((r) =>
-                                applyTranslation(r.translated),
-                            ),
+                            googleTranslate(subText, lang)
+                                .then((r) => applyTranslation(r.translated))
+                                .catch(() => restoreOriginal()),
                         );
-                    }, 30);
+                    } else {
+                        // Rare fallback: DOM might update after pause, retry briefly
+                        let attempt = 0;
+                        const RETRY_DELAYS = [50, 150];
+
+                        function retryResolve() {
+                            const post = getCurrentSubtitleText(video);
+                            if (post) {
+                                getTargetLang().then((lang) =>
+                                    googleTranslate(post, lang)
+                                        .then((r) =>
+                                            applyTranslation(r.translated),
+                                        )
+                                        .catch(() => restoreOriginal()),
+                                );
+                                return;
+                            }
+                            attempt++;
+                            if (attempt < RETRY_DELAYS.length) {
+                                setTimeout(retryResolve, RETRY_DELAYS[attempt]);
+                            } else {
+                                restoreOriginal();
+                                if (eWasPlaying) video.play();
+                                eWasPlaying = false;
+                            }
+                        }
+
+                        setTimeout(retryResolve, RETRY_DELAYS[0]);
+                    }
                     return;
                 }
 
