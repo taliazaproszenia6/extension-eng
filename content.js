@@ -888,6 +888,21 @@
                     showSubLoading();
 
                     if (subText) {
+                        // Speak original text if subtitleTTS is enabled
+                        if (chrome?.storage?.sync) {
+                            chrome.storage.sync.get(
+                                { subtitleTTS: false },
+                                (data) => {
+                                    if (data.subtitleTTS) {
+                                        const pageLang =
+                                            document.documentElement.lang ||
+                                            navigator.language ||
+                                            "en";
+                                        speak(subText, pageLang);
+                                    }
+                                },
+                            );
+                        }
                         // Text found – translate right away
                         getTargetLang().then((lang) =>
                             googleTranslate(subText, lang)

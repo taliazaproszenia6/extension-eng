@@ -231,6 +231,20 @@ hoverToggle.addEventListener("change", () => {
     );
 });
 
+// ── Subtitle TTS toggle ──────────────────────────────────────────
+const subtitleTTSToggle = document.getElementById("subtitleTTS");
+
+chrome.storage.sync.get({ subtitleTTS: false }, (data) => {
+    subtitleTTSToggle.checked = data.subtitleTTS;
+});
+
+subtitleTTSToggle.addEventListener("change", () => {
+    chrome.storage.sync.set(
+        { subtitleTTS: subtitleTTSToggle.checked },
+        flashSaved,
+    );
+});
+
 // ── Populate voices ───────────────────────────────────────────────
 function loadVoices(selectedVoice) {
     const voices = window.speechSynthesis.getVoices();
