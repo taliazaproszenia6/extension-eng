@@ -549,7 +549,7 @@
     // ═══════════════════════════════════════════════════════════════
     //  Keyboard Subtitle Navigation (all video sites)
     //  A/← = prev sentence, D/→ = next, W/↑ = play/pause,
-    //  S/↓ = repeat, E/Enter = translate subtitle in-place
+    //  S/↓/E/Enter = translate subtitle in-place
     // ═══════════════════════════════════════════════════════════════
 
     (function setupSubtitleNavigation() {
@@ -742,8 +742,15 @@
                 e.preventDefault();
                 e.stopPropagation();
 
-                // E / Enter = toggle subtitle translation in-place
-                if (key === "e" || key === "E" || key === "Enter") {
+                // S / ArrowDown / E / Enter = toggle subtitle translation in-place
+                if (
+                    key === "s" ||
+                    key === "S" ||
+                    key === "ArrowDown" ||
+                    key === "e" ||
+                    key === "E" ||
+                    key === "Enter"
+                ) {
                     if (eTranslateActive) {
                         restoreOriginal();
                         if (eWasPlaying) video.play();
@@ -800,20 +807,6 @@
                 // W / ArrowUp = play/pause
                 if (key === "w" || key === "W" || key === "ArrowUp") {
                     video.paused ? video.play() : video.pause();
-                    return;
-                }
-
-                // S / ArrowDown = repeat current
-                if (key === "s" || key === "S" || key === "ArrowDown") {
-                    if (hasCues) {
-                        video.currentTime =
-                            cues[
-                                getCurrentCueIndex(cues, video.currentTime)
-                            ].startTime;
-                    } else {
-                        video.currentTime = Math.max(0, video.currentTime - 3);
-                    }
-                    if (video.paused) video.play();
                     return;
                 }
 
