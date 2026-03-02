@@ -880,6 +880,13 @@
                 ];
                 if (!NAV_KEYS.includes(key)) return;
 
+                // In YouTube Reels mode, let youtube.js handle translate keys
+                if (
+                    document.body.classList.contains("__qt_reels-active") &&
+                    ["s", "S", "ArrowDown", "e", "E", "Enter"].includes(key)
+                )
+                    return;
+
                 const video = getActiveVideo();
                 if (!video) return;
 

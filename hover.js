@@ -83,10 +83,12 @@
         // Skip elements already handled by site-specific modules
         if (
             el.matches?.(
-                `[class*="${PREFIX}yt-word"], [class*="${PREFIX}nf-word"], [class*="${PREFIX}lm-word"], [class*="${PREFIX}x-word"]`,
+                `[class*="${PREFIX}yt-word"], [class*="${PREFIX}nf-word"], [class*="${PREFIX}lm-word"], [class*="${PREFIX}x-word"], [class*="${PREFIX}reels-"]`,
             )
         )
             return null;
+        // Skip anything inside reels overlay container
+        if (el.closest?.(`.${PREFIX}reels-container`)) return null;
 
         // Skip form / interactive elements
         const tag = el.tagName;
