@@ -28,6 +28,8 @@ document.querySelectorAll(".tab").forEach((tab) => {
 const voiceSelect = document.getElementById("voiceSelect");
 const rateRange = document.getElementById("rateRange");
 const rateValue = document.getElementById("rateValue");
+const volumeRange = document.getElementById("volumeRange");
+const volumeValue = document.getElementById("volumeValue");
 
 // ── Auto-switch to Review tab if there are due reviews ────────────
 chrome.storage.local.get({ savedWords: [] }, (data) => {
@@ -203,11 +205,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // ── Settings: load & save language ────────────────────────────────
 chrome.storage.sync.get(
-    { targetLang: "pl", speechVoice: "", speechRate: 0.95 },
+    { targetLang: "pl", speechVoice: "", speechRate: 0.95, ttsVolume: 1 },
     (data) => {
         select.value = data.targetLang;
         rateRange.value = data.speechRate;
         rateValue.textContent = parseFloat(data.speechRate).toFixed(2);
+        if (data.ttsVolume !== undefined && volumeRange) {
+            volumeRange.value = data.ttsVolume;
+            volumeValue.textContent = Math.round(data.ttsVolume * 100) + "%";
+        }
         // Load voices and set selection
         loadVoices(data.speechVoice);
     },
@@ -279,6 +285,20 @@ rateRange.addEventListener("change", () => {
         flashSaved,
     );
 });
+
+// ── Volume slider ─────────────────────────────────────────────────
+if (volumeRange) {
+    volumeRange.addEventListener("input", () => {
+        volumeValue.textContent =
+            Math.round(parseFloat(volumeRange.value) * 100) + "%";
+    });
+    volumeRange.addEventListener("change", () => {
+        chrome.storage.sync.set(
+            { ttsVolume: parseFloat(volumeRange.value) },
+            flashSaved,
+        );
+    });
+}
 
 // ── TTS Mode toggle (Browser / ElevenLabs) ───────────────────────
 const modeBrowserBtn = document.getElementById("modeBrowser");
@@ -1116,6 +1136,7 @@ function popupSpeak(text, lang) {
                 elVoiceId: "",
                 speechVoice: "",
                 speechRate: 0.95,
+                ttsVolume: 1,
             },
             async (data) => {
                 // ElevenLabs path
@@ -1147,6 +1168,8 @@ function popupSpeak(text, lang) {
                         const blob = await res.blob();
                         const url = URL.createObjectURL(blob);
                         popupElAudio = new Audio(url);
+                        popupElAudio.volume =
+                            data.ttsVolume !== undefined ? data.ttsVolume : 1;
                         popupElAudio.play();
                         resolve({ type: "audio", obj: popupElAudio });
                     } catch (err) {
@@ -1161,6 +1184,8 @@ function popupSpeak(text, lang) {
                 );
                 utter.lang = lang || "en";
                 utter.rate = data.speechRate;
+                utter.volume =
+                    data.ttsVolume !== undefined ? data.ttsVolume : 1;
                 const voice = pickPopupVoice(data.speechVoice, lang);
                 if (voice) utter.voice = voice;
                 window.speechSynthesis.speak(utter);

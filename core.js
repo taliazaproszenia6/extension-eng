@@ -431,26 +431,31 @@
                     elVoiceId: "",
                     speechVoice: "",
                     speechRate: 0.95,
+                    ttsVolume: 1,
                 },
                 async (data) => {
+                    const vol =
+                        data.ttsVolume !== undefined ? data.ttsVolume : 1;
                     if (
                         data.ttsMode === "elevenlabs" &&
                         data.elApiKey &&
                         data.elVoiceId
                     ) {
-                        resolve(
-                            await speakElevenLabs(
-                                text,
-                                data.elApiKey,
-                                data.elVoiceId,
-                            ),
+                        const audio = await speakElevenLabs(
+                            text,
+                            data.elApiKey,
+                            data.elVoiceId,
                         );
+                        if (audio instanceof HTMLAudioElement)
+                            audio.volume = vol;
+                        resolve(audio);
                     } else {
                         const utter = new SpeechSynthesisUtterance(
                             cleanTextForTTS(text),
                         );
                         utter.lang = lang;
                         utter.rate = data.speechRate;
+                        utter.volume = vol;
                         const voice = pickBestVoice(data.speechVoice, lang);
                         if (voice) utter.voice = voice;
                         window.speechSynthesis.speak(utter);

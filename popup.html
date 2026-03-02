@@ -39,7 +39,7 @@
 
         body {
             width: 560px;
-            max-height: 940px;
+            max-height: 1240px;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background: var(--bg-deep);
             color: var(--text-secondary);
@@ -1520,6 +1520,16 @@
                         <div class="slider-row">
                             <input type="range" id="rateRange" min="0.3" max="2" step="0.1" value="0.95">
                             <span class="slider-value" id="rateValue">0.95</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="volumeRange">Głośność TTS</label>
+                    <div class="glass-card">
+                        <div class="slider-row">
+                            <input type="range" id="volumeRange" min="0" max="1" step="0.05" value="1">
+                            <span class="slider-value" id="volumeValue">100%</span>
                         </div>
                     </div>
                 </div>

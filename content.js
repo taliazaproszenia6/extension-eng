@@ -387,8 +387,11 @@
                     elVoiceId: "",
                     speechVoice: "",
                     speechRate: 0.95,
+                    ttsVolume: 1,
                 },
                 async (data) => {
+                    const vol =
+                        data.ttsVolume !== undefined ? data.ttsVolume : 1;
                     if (
                         data.ttsMode === "elevenlabs" &&
                         data.elApiKey &&
@@ -396,6 +399,7 @@
                     ) {
                         const audio = await QT.speak(text, lang);
                         if (audio instanceof HTMLAudioElement) {
+                            audio.volume = vol;
                             audio.onended = () => {
                                 idx++;
                                 readNext();
@@ -414,6 +418,7 @@
                         const utter = new SpeechSynthesisUtterance(text);
                         utter.lang = lang;
                         utter.rate = data.speechRate;
+                        utter.volume = vol;
                         const voice = pickBestVoice(data.speechVoice, lang);
                         if (voice) utter.voice = voice;
                         utter.onend = () => {
@@ -886,6 +891,14 @@
                 ensureControlsHidden();
                 clearTimeout(_controlBarTimer);
 
+                // If translation overlay is active, ANY nav key dismisses it
+                if (eTranslateActive) {
+                    restoreOriginal();
+                    video.play();
+                    eWasPlaying = false;
+                    return;
+                }
+
                 // S / ArrowDown / E / Enter = toggle subtitle translation in-place
                 if (
                     key === "s" ||
@@ -895,13 +908,6 @@
                     key === "E" ||
                     key === "Enter"
                 ) {
-                    if (eTranslateActive) {
-                        restoreOriginal();
-                        if (eWasPlaying) video.play();
-                        eWasPlaying = false;
-                        return;
-                    }
-
                     // Capture text IMMEDIATELY from all sources before anything else
                     const capturedTime = video.currentTime;
                     let subText = getCurrentSubtitleText(video);
