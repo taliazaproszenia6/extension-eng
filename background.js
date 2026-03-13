@@ -506,4 +506,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             .catch((e) => sendResponse({ error: e.message }));
         return true; // keep service worker alive until delete completes
     }
+    if (msg.type === "QT_FIRESTORE_DELETE_BATCH" && msg.words) {
+        Promise.all(msg.words.map((w) => firebaseDeleteWord(w)))
+            .then(() => sendResponse({ ok: true }))
+            .catch((e) => sendResponse({ error: e.message }));
+        return true;
+    }
 });

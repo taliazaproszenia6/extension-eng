@@ -532,6 +532,69 @@ function deleteWord(original, timestamp) {
     });
 }
 
+// ── Delete single review word (from review tab) ──────────────────
+function deleteReviewWord(w) {
+    if (!confirm(`Usunąć "${w.original}" z bazy danych?`)) return;
+    chrome.storage.local.get({ savedWords: [] }, (data) => {
+        const words = data.savedWords.filter(
+            (x) =>
+                !(x.original === w.original && x.translated === w.translated),
+        );
+        chrome.storage.local.set({ savedWords: words }, () => {
+            // Delete from Firestore
+            chrome.runtime.sendMessage({
+                type: "QT_FIRESTORE_DELETE",
+                word: { original: w.original, translated: w.translated },
+            });
+            // Remove from current queue and continue
+            reviewQueue.splice(reviewIndex, 1);
+            reviewTotalDue = reviewQueue.length;
+            if (reviewIndex >= reviewQueue.length)
+                reviewIndex = reviewQueue.length - 1;
+            if (reviewIndex < 0) reviewIndex = 0;
+            reviewAnswerShown = false;
+            renderReview();
+        });
+    });
+}
+
+// ── Delete all due reviews ───────────────────────────────────────
+function deleteAllReviews() {
+    if (!confirm("Usunąć WSZYSTKIE słowa w kolejce powtórek z bazy danych?"))
+        return;
+    chrome.storage.local.get({ savedWords: [] }, (data) => {
+        const allWords = data.savedWords || [];
+        const now = Date.now();
+        const dueWords = allWords.filter((w) => {
+            if (!w.sr) return true;
+            return w.sr.nextReview <= now;
+        });
+        if (dueWords.length === 0) return;
+
+        const dueSet = new Set(
+            dueWords.map((w) => w.original + "|" + w.translated),
+        );
+        const remaining = allWords.filter(
+            (w) => !dueSet.has(w.original + "|" + w.translated),
+        );
+        chrome.storage.local.set({ savedWords: remaining }, () => {
+            // Delete from Firestore in batch
+            chrome.runtime.sendMessage({
+                type: "QT_FIRESTORE_DELETE_BATCH",
+                words: dueWords.map((w) => ({
+                    original: w.original,
+                    translated: w.translated,
+                })),
+            });
+            reviewQueue = [];
+            reviewIndex = 0;
+            reviewTotalDue = 0;
+            reviewAnswerShown = false;
+            renderReview();
+        });
+    });
+}
+
 // ── Google TTS URL helper ─────────────────────────────────────────
 function googleTtsUrl(text, lang) {
     return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(text)}`;
@@ -787,15 +850,26 @@ document.getElementById("exportCsv").addEventListener("click", () => {
 document.getElementById("clearAll").addEventListener("click", () => {
     if (!confirm("Usunąć widoczne słowa?")) return;
     chrome.storage.local.get({ savedWords: [] }, (data) => {
+        const visibleWords = filterWords(data.savedWords);
         const toRemove = new Set(
-            filterWords(data.savedWords).map(
-                (w) => w.original + "|" + w.timestamp,
-            ),
+            visibleWords.map((w) => w.original + "|" + w.timestamp),
         );
         const remaining = data.savedWords.filter(
             (w) => !toRemove.has(w.original + "|" + w.timestamp),
         );
-        chrome.storage.local.set({ savedWords: remaining }, loadWords);
+        chrome.storage.local.set({ savedWords: remaining }, () => {
+            loadWords();
+            // Delete from Firestore in batch
+            if (visibleWords.length > 0) {
+                chrome.runtime.sendMessage({
+                    type: "QT_FIRESTORE_DELETE_BATCH",
+                    words: visibleWords.map((w) => ({
+                        original: w.original,
+                        translated: w.translated,
+                    })),
+                });
+            }
+        });
     });
 });
 
@@ -1022,6 +1096,11 @@ document.getElementById("reviewDirBtn")?.addEventListener("click", () => {
     renderReview();
 });
 
+// ── Delete all reviews button ─────────────────────────────────────
+document.getElementById("reviewDeleteAll")?.addEventListener("click", () => {
+    deleteAllReviews();
+});
+
 // ── Load due reviews ──────────────────────────────────────────────
 function loadReviewQueue() {
     chrome.storage.local.get({ savedWords: [] }, (data) => {
@@ -1229,10 +1308,12 @@ function renderReview() {
     const card = document.getElementById("reviewCard");
     const countEl = document.getElementById("reviewCount");
     const progressBar = document.getElementById("reviewProgressBar");
+    const deleteAllBtn = document.getElementById("reviewDeleteAll");
 
     if (reviewQueue.length === 0) {
         countEl.textContent = "";
         progressBar.style.width = "100%";
+        if (deleteAllBtn) deleteAllBtn.style.display = "none";
         card.innerHTML = `
             <div class="review-empty">
                 <div class="review-empty-icon">✅</div>
@@ -1242,6 +1323,8 @@ function renderReview() {
         updateReviewTabBadge(0);
         return;
     }
+
+    if (deleteAllBtn) deleteAllBtn.style.display = "";
 
     if (reviewIndex >= reviewQueue.length) {
         countEl.textContent = `${reviewTotalDue}/${reviewTotalDue}`;
@@ -1387,7 +1470,10 @@ function renderAnswer(w) {
             </div>
             <div class="review-hint">Klawisze <kbd>1</kbd>-<kbd>5</kbd> = ocena</div>
         </div>
-        <button class="review-edit-btn" id="reviewEditBtn">✏️ Edytuj</button>`;
+        <div class="review-actions-row">
+            <button class="review-edit-btn" id="reviewEditBtn">✏️ Edytuj</button>
+            <button class="review-delete-btn" id="reviewDeleteBtn">🗑 Usuń</button>
+        </div>`;
 
     // Attach TTS handlers
     attachReviewSpeakHandlers(card);
@@ -1402,6 +1488,11 @@ function renderAnswer(w) {
     // Edit button
     document.getElementById("reviewEditBtn").addEventListener("click", () => {
         showReviewEditForm(w);
+    });
+
+    // Delete button
+    document.getElementById("reviewDeleteBtn").addEventListener("click", () => {
+        deleteReviewWord(w);
     });
 }
 
