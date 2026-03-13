@@ -358,13 +358,15 @@ subBgOpacity.addEventListener("change", saveSubStyles);
 function loadVoices(selectedVoice) {
     const voices = window.speechSynthesis.getVoices();
     voiceSelect.innerHTML = '<option value="">🔊 Domyślny</option>';
-    voices.forEach((v) => {
-        const opt = document.createElement("option");
-        opt.value = v.name;
-        opt.textContent = `${v.name} (${v.lang})`;
-        if (v.name === selectedVoice) opt.selected = true;
-        voiceSelect.appendChild(opt);
-    });
+    voices
+        .filter((v) => /google/i.test(v.name))
+        .forEach((v) => {
+            const opt = document.createElement("option");
+            opt.value = v.name;
+            opt.textContent = `${v.name} (${v.lang})`;
+            if (v.name === selectedVoice) opt.selected = true;
+            voiceSelect.appendChild(opt);
+        });
 }
 
 // Voices may load async

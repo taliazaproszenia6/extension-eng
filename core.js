@@ -329,36 +329,21 @@
         const voices = window.speechSynthesis.getVoices();
         if (!voices.length) return null;
 
+        // Only use Google voices
+        const googleVoices = voices.filter((v) => /google/i.test(v.name));
+
         if (savedVoiceName) {
-            const exact = voices.find((v) => v.name === savedVoiceName);
+            const exact = googleVoices.find((v) => v.name === savedVoiceName);
             if (exact) return exact;
         }
 
         const baseLang = (lang || "en").split("-")[0].toLowerCase();
-        const langVoices = voices.filter((v) =>
+        const langVoices = googleVoices.filter((v) =>
             v.lang.toLowerCase().startsWith(baseLang),
         );
         if (!langVoices.length) return null;
 
-        const naturalPatterns = [
-            /microsoft\s+(aria|jenny).*natural/i,
-            /microsoft\s+(aria|jenny)/i,
-            /natural/i,
-            /neural/i,
-            /online/i,
-            /enhanced/i,
-            /premium/i,
-            /microsoft.*(guy|ana|christopher|eric|michelle|steffan)/i,
-            /google\s+u[sk]/i,
-            /google/i,
-        ];
-
-        for (const pattern of naturalPatterns) {
-            const match = langVoices.find((v) => pattern.test(v.name));
-            if (match) return match;
-        }
-
-        return langVoices.find((v) => !v.localService) || langVoices[0];
+        return langVoices[0];
     }
 
     // ═══════════════════════════════════════════════════════════════
