@@ -836,6 +836,118 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
+    //  Subtitle Style Injection (non-Reels mode)
+    // ═══════════════════════════════════════════════════════════════
+
+    const SUB_STYLE_ID = PREFIX + "sub-style";
+    const SUB_STYLE_DEFAULTS = {
+        subFontFamily: "",
+        subFontWeight: "",
+        subFontSize: "",
+        subColor: "#ffffff",
+        subBgColor: "#000000",
+        subBgOpacity: 0,
+        subTextShadow: "",
+    };
+
+    /**
+     * Build and inject a <style> element that overrides subtitle word
+     * appearance for non-Reels mode (YT, Netflix, LookMovie).
+     */
+    function applySubtitleStyles(data) {
+        let styleEl = document.getElementById(SUB_STYLE_ID);
+        if (!styleEl) {
+            styleEl = document.createElement("style");
+            styleEl.id = SUB_STYLE_ID;
+            document.head.appendChild(styleEl);
+        }
+
+        const rules = [];
+
+        // Non-Reels word selectors (YT segments, NF words, LM words)
+        const selectors = [
+            `.ytp-caption-segment.${PREFIX}clickable`,
+            `.${PREFIX}yt-word`,
+            `.${PREFIX}nf-word`,
+            `.${PREFIX}lm-word`,
+            `.player-timedtext-text-container span.${PREFIX}clickable`,
+            `.vjs-text-track-cue div`,
+        ];
+        const sel = selectors.join(",\n");
+
+        const props = [];
+
+        if (data.subFontFamily) {
+            props.push(`font-family: ${data.subFontFamily} !important`);
+        }
+        if (data.subFontWeight) {
+            props.push(`font-weight: ${data.subFontWeight} !important`);
+        }
+        if (data.subFontSize) {
+            const scale = parseFloat(data.subFontSize);
+            if (scale && scale !== 1) {
+                props.push(`font-size: ${scale}em !important`);
+            }
+        }
+        if (data.subColor && data.subColor !== "#ffffff") {
+            props.push(`color: ${data.subColor} !important`);
+        }
+        if (data.subTextShadow) {
+            if (data.subTextShadow === "none") {
+                props.push(`text-shadow: none !important`);
+            } else {
+                props.push(`text-shadow: ${data.subTextShadow} !important`);
+            }
+        }
+
+        // Background on the parent containers
+        if (data.subBgOpacity > 0) {
+            const hex = data.subBgColor || "#000000";
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            const bgVal = `rgba(${r}, ${g}, ${b}, ${data.subBgOpacity})`;
+
+            // Apply background to caption segments / containers
+            rules.push(
+                `.ytp-caption-segment.${PREFIX}clickable { background-color: ${bgVal} !important; border-radius: 4px; padding: 2px 6px !important; }`,
+            );
+            rules.push(
+                `.player-timedtext-text-container span.${PREFIX}clickable { background-color: ${bgVal} !important; border-radius: 4px; padding: 2px 6px !important; }`,
+            );
+            rules.push(
+                `.vjs-text-track-cue { background-color: ${bgVal} !important; border-radius: 4px; padding: 2px 6px !important; }`,
+            );
+        }
+
+        if (props.length > 0) {
+            rules.push(`${sel} { ${props.join("; ")}; }`);
+        }
+
+        styleEl.textContent = rules.join("\n");
+    }
+
+    /** Load subtitle styles from storage and apply them */
+    function loadAndApplySubtitleStyles() {
+        if (!chrome?.storage?.sync) return;
+        chrome.storage.sync.get(SUB_STYLE_DEFAULTS, applySubtitleStyles);
+    }
+
+    // Apply on load
+    loadAndApplySubtitleStyles();
+
+    // Re-apply when settings change
+    if (chrome?.storage?.onChanged) {
+        chrome.storage.onChanged.addListener((changes, area) => {
+            if (area !== "sync") return;
+            const subKeys = Object.keys(SUB_STYLE_DEFAULTS);
+            if (subKeys.some((k) => k in changes)) {
+                loadAndApplySubtitleStyles();
+            }
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     //  Expose Global Namespace
     // ═══════════════════════════════════════════════════════════════
 

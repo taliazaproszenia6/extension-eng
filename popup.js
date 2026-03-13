@@ -251,6 +251,102 @@ subtitleTTSToggle.addEventListener("change", () => {
     );
 });
 
+// ── Subtitle Style Settings ───────────────────────────────────────
+const subFontFamily = document.getElementById("subFontFamily");
+const subFontWeight = document.getElementById("subFontWeight");
+const subFontSize = document.getElementById("subFontSize");
+const subColor = document.getElementById("subColor");
+const subColorHex = document.getElementById("subColorHex");
+const subBgColor = document.getElementById("subBgColor");
+const subBgColorHex = document.getElementById("subBgColorHex");
+const subBgOpacity = document.getElementById("subBgOpacity");
+const subBgOpacityValue = document.getElementById("subBgOpacityValue");
+const subTextShadow = document.getElementById("subTextShadow");
+const subPreview = document.getElementById("subPreview");
+
+const SUB_STYLE_DEFAULTS = {
+    subFontFamily: "",
+    subFontWeight: "",
+    subFontSize: "",
+    subColor: "#ffffff",
+    subBgColor: "#000000",
+    subBgOpacity: 0,
+    subTextShadow: "",
+};
+
+function updateSubPreview() {
+    if (!subPreview) return;
+    subPreview.style.fontFamily = subFontFamily.value || "inherit";
+    subPreview.style.fontWeight = subFontWeight.value || "700";
+    const scale = parseFloat(subFontSize.value) || 1;
+    subPreview.style.fontSize = Math.round(22 * scale) + "px";
+    subPreview.style.color = subColor.value;
+    const opacity = parseFloat(subBgOpacity.value) || 0;
+    const bgHex = subBgColor.value;
+    const r = parseInt(bgHex.slice(1, 3), 16);
+    const g = parseInt(bgHex.slice(3, 5), 16);
+    const b = parseInt(bgHex.slice(5, 7), 16);
+    subPreview.parentElement.style.background = `rgba(${r}, ${g}, ${b}, ${Math.max(opacity, 0.3)})`;
+    subPreview.style.textShadow =
+        subTextShadow.value ||
+        "0 0 5px rgba(0,0,0,0.9), 2px 2px 4px rgba(0,0,0,0.9)";
+}
+
+function saveSubStyles() {
+    chrome.storage.sync.set(
+        {
+            subFontFamily: subFontFamily.value,
+            subFontWeight: subFontWeight.value,
+            subFontSize: subFontSize.value,
+            subColor: subColor.value,
+            subBgColor: subBgColor.value,
+            subBgOpacity: parseFloat(subBgOpacity.value),
+            subTextShadow: subTextShadow.value,
+        },
+        flashSaved,
+    );
+    updateSubPreview();
+}
+
+// Load saved subtitle styles
+chrome.storage.sync.get(SUB_STYLE_DEFAULTS, (data) => {
+    subFontFamily.value = data.subFontFamily;
+    subFontWeight.value = data.subFontWeight;
+    subFontSize.value = data.subFontSize;
+    subColor.value = data.subColor;
+    subColorHex.textContent = data.subColor;
+    subBgColor.value = data.subBgColor;
+    subBgColorHex.textContent = data.subBgColor;
+    subBgOpacity.value = data.subBgOpacity;
+    subBgOpacityValue.textContent = Math.round(data.subBgOpacity * 100) + "%";
+    subTextShadow.value = data.subTextShadow;
+    updateSubPreview();
+});
+
+// Attach change listeners
+[subFontFamily, subFontWeight, subFontSize, subTextShadow].forEach((el) => {
+    el.addEventListener("change", saveSubStyles);
+});
+
+subColor.addEventListener("input", () => {
+    subColorHex.textContent = subColor.value;
+    updateSubPreview();
+});
+subColor.addEventListener("change", saveSubStyles);
+
+subBgColor.addEventListener("input", () => {
+    subBgColorHex.textContent = subBgColor.value;
+    updateSubPreview();
+});
+subBgColor.addEventListener("change", saveSubStyles);
+
+subBgOpacity.addEventListener("input", () => {
+    subBgOpacityValue.textContent =
+        Math.round(parseFloat(subBgOpacity.value) * 100) + "%";
+    updateSubPreview();
+});
+subBgOpacity.addEventListener("change", saveSubStyles);
+
 // ── Populate voices ───────────────────────────────────────────────
 function loadVoices(selectedVoice) {
     const voices = window.speechSynthesis.getVoices();
