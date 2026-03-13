@@ -198,7 +198,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
     }
     if (area === "local" && changes.savedWords) {
         // Refresh review queue whenever words change (e.g. synced SR data)
-        loadReviewQueue();
+        // But skip if the change came from rating a word in the current session
+        if (!_reviewSaving) {
+            loadReviewQueue();
+        }
         initReviewBadge();
     }
 });
@@ -1182,6 +1185,7 @@ let reviewQueue = [];
 let reviewIndex = 0;
 let reviewAnswerShown = false;
 let reviewTotalDue = 0;
+let _reviewSaving = false; // guard: skip storage listener while rating
 
 // ── Default SR data for words that don't have it ──────────────────
 function ensureSR(word) {
@@ -1733,6 +1737,7 @@ function rateWord(grade) {
     w._sessionAttempts = (w._sessionAttempts || 0) + 1;
 
     // Persist
+    _reviewSaving = true;
     chrome.storage.local.get({ savedWords: [] }, (data) => {
         const words = data.savedWords || [];
         const idx = words.findIndex(
@@ -1742,6 +1747,7 @@ function rateWord(grade) {
             words[idx].sr = w.sr;
             words[idx].updatedAt = Date.now();
             chrome.storage.local.set({ savedWords: words }, () => {
+                _reviewSaving = false;
                 if (grade < 5 && w._sessionAttempts < 3) {
                     // Grades 1-4: re-insert word later in the queue
                     // so it comes back again in this session (max 3 attempts)
@@ -1763,6 +1769,7 @@ function rateWord(grade) {
             });
         } else {
             // word may have been deleted – just advance
+            _reviewSaving = false;
             reviewIndex++;
             reviewAnswerShown = false;
             renderReview();
