@@ -1090,6 +1090,17 @@ Respond ONLY in this exact JSON format, nothing else:
             rules.push(`${sel} { ${props.join("; ")}; }`);
         }
 
+        // Force caption containers to be wide enough so text doesn't wrap after 1-2 words
+        rules.push(
+            `.ytp-caption-window-container .caption-window { width: 50vw !important; max-width: 80vw !important; left: 50% !important; }`,
+        );
+        rules.push(
+            `.ytp-caption-window-container .ytp-caption-segment { display: inline !important; white-space: normal !important; }`,
+        );
+        rules.push(
+            `.player-timedtext-text-container { width: 40vw !important; max-width: 80vw !important; }`,
+        );
+
         styleEl.textContent = rules.join("\n");
     }
 
