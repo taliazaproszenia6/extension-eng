@@ -1518,6 +1518,7 @@ function renderReview() {
                 </div>`
                         : ""
                 }
+                ${w.screenshot ? `<div class="review-screenshot"><img src="${w.screenshot}" alt="Screenshot" class="review-screenshot-img"></div>` : ""}
                 <div class="review-meta">${dirLabel}</div>
             </div>
             <button class="review-reveal-btn" id="revealBtn">▸ Pokaż odpowiedź</button>
@@ -1570,6 +1571,7 @@ function renderAnswer(w) {
             </div>`
                     : ""
             }
+            ${w.screenshot ? `<div class="review-screenshot"><img src="${w.screenshot}" alt="Screenshot" class="review-screenshot-img"></div>` : ""}
         </div>
         <div class="review-answer">
             <div class="review-translation-row">
