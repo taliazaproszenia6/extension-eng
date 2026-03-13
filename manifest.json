@@ -8,7 +8,8 @@
     "host_permissions": [
         "https://identitytoolkit.googleapis.com/*",
         "https://firestore.googleapis.com/*",
-        "https://securetoken.googleapis.com/*"
+        "https://securetoken.googleapis.com/*",
+        "https://generativelanguage.googleapis.com/*"
     ],
     "background": {
         "service_worker": "background.js"

@@ -350,6 +350,12 @@
                 return;
             }
 
+            // Toggle subtitle styles with U
+            if (e.key === "u" || e.key === "U") {
+                QT.toggleSubtitleStyles();
+                return;
+            }
+
             // S / E / Enter / ArrowDown → translate displayed word in reels mode
             if (reelsMode && TRANSLATE_KEYS.has(e.key)) {
                 e.preventDefault();

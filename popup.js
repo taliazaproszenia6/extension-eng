@@ -264,7 +264,10 @@ const subBgOpacityValue = document.getElementById("subBgOpacityValue");
 const subTextShadow = document.getElementById("subTextShadow");
 const subPreview = document.getElementById("subPreview");
 
+const subStyleEnabled = document.getElementById("subStyleEnabled");
+
 const SUB_STYLE_DEFAULTS = {
+    subStyleEnabled: true,
     subFontFamily: "",
     subFontWeight: "",
     subFontSize: "",
@@ -295,6 +298,7 @@ function updateSubPreview() {
 function saveSubStyles() {
     chrome.storage.sync.set(
         {
+            subStyleEnabled: subStyleEnabled.checked,
             subFontFamily: subFontFamily.value,
             subFontWeight: subFontWeight.value,
             subFontSize: subFontSize.value,
@@ -310,6 +314,7 @@ function saveSubStyles() {
 
 // Load saved subtitle styles
 chrome.storage.sync.get(SUB_STYLE_DEFAULTS, (data) => {
+    subStyleEnabled.checked = data.subStyleEnabled !== false;
     subFontFamily.value = data.subFontFamily;
     subFontWeight.value = data.subFontWeight;
     subFontSize.value = data.subFontSize;
@@ -322,6 +327,8 @@ chrome.storage.sync.get(SUB_STYLE_DEFAULTS, (data) => {
     subTextShadow.value = data.subTextShadow;
     updateSubPreview();
 });
+
+subStyleEnabled.addEventListener("change", saveSubStyles);
 
 // Attach change listeners
 [subFontFamily, subFontWeight, subFontSize, subTextShadow].forEach((el) => {
@@ -481,6 +488,22 @@ async function loadELVoices(apiKey, selectedVoiceId) {
 
 elVoiceSelect.addEventListener("change", () => {
     chrome.storage.sync.set({ elVoiceId: elVoiceSelect.value }, flashSaved);
+});
+
+// ── Gemini API Key ────────────────────────────────────────────────
+const geminiApiKeyInput = document.getElementById("geminiApiKey");
+chrome.storage.sync.get({ geminiApiKey: "" }, (data) => {
+    if (data.geminiApiKey) geminiApiKeyInput.value = data.geminiApiKey;
+});
+let geminiKeyDebounce = null;
+geminiApiKeyInput.addEventListener("input", () => {
+    clearTimeout(geminiKeyDebounce);
+    geminiKeyDebounce = setTimeout(() => {
+        chrome.storage.sync.set(
+            { geminiApiKey: geminiApiKeyInput.value.trim() },
+            flashSaved,
+        );
+    }, 600);
 });
 
 // ── Filter state ──────────────────────────────────────────────────
@@ -826,25 +849,52 @@ document.getElementById("exportAnki").addEventListener("click", async () => {
             const w = words[i];
 
             // Build Cloze text: sentence with the word as {{c1::word::translation}}
+            // Priority: AI sentence > original sentence > word only
             let clozeText;
-            if (w.sentence) {
+            const sentenceSource = w.aiSentence || w.sentence;
+            if (sentenceSource) {
                 // Replace the word in sentence with cloze deletion
                 const regex = new RegExp(
                     `(${w.original.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
                     "i",
                 );
-                clozeText = w.sentence.replace(
+                clozeText = sentenceSource.replace(
                     regex,
                     `{{c1::$1::${w.translated}}}`,
                 );
+                // If word not found in AI sentence, wrap the whole thing
+                if (clozeText === sentenceSource) {
+                    clozeText = `{{c1::${w.original}::${w.translated}}}<br><br>${sentenceSource}`;
+                }
             } else {
                 clozeText = `{{c1::${w.original}::${w.translated}}}`;
             }
 
-            // Back side: translation + sentence translation + audio
+            // Back side: translation + sentence translations + screenshot + audio
             let backText = w.translated;
-            if (w.sentenceTranslated) {
+            if (w.aiSentenceTranslated) {
+                backText += `<br><br>✨ <i>${w.aiSentenceTranslated}</i>`;
+            }
+            if (
+                w.sentenceTranslated &&
+                w.sentenceTranslated !== w.aiSentenceTranslated
+            ) {
                 backText += `<br><br><i>${w.sentenceTranslated}</i>`;
+            }
+
+            // Screenshot image
+            if (w.screenshot) {
+                const ts = (w.timestamp || Date.now()).toString(36);
+                const imgFile = `qt_screenshot_${ts}.jpg`;
+                // Convert base64 data URL to binary
+                const base64 = w.screenshot.split(",")[1];
+                const binaryStr = atob(base64);
+                const imgData = new Uint8Array(binaryStr.length);
+                for (let j = 0; j < binaryStr.length; j++) {
+                    imgData[j] = binaryStr.charCodeAt(j);
+                }
+                files.push({ name: imgFile, data: imgData });
+                backText += `<br><br><img src="${imgFile}">`;
             }
 
             // One sound on back only: sentence audio if sentence exists, otherwise word audio

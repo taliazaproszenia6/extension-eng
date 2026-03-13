@@ -21,6 +21,8 @@
         SAVE_CHECK: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#4ecdc4" stroke="#4ecdc4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>`,
         SAVE_SENTENCE: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
         SAVE_SENTENCE_CHECK: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#4ecdc4" stroke="#4ecdc4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+        SAVE_AI: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`,
+        SAVE_AI_CHECK: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#a78bfa" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`,
         READ: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`,
         SPEAKER_FULL: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`,
     };
@@ -489,7 +491,9 @@
             const exists = words.some(
                 (w) =>
                     w.original === entry.original &&
-                    w.translated === entry.translated,
+                    w.translated === entry.translated &&
+                    (w.sentence || "") === (entry.sentence || "") &&
+                    (w.aiSentence || "") === (entry.aiSentence || ""),
             );
             if (!exists) {
                 // Attach spaced-repetition metadata
@@ -505,6 +509,105 @@
                 words.push(entry);
                 chrome.storage.local.set({ savedWords: words });
             }
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Video Screenshot Capture
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Capture a screenshot of the current video frame as a base64 JPEG.
+     * Returns null if no video is playing or capture fails.
+     */
+    function captureVideoScreenshot() {
+        try {
+            const video = document.querySelector("video");
+            if (!video || video.readyState < 2) return null;
+
+            const canvas = document.createElement("canvas");
+            canvas.width = video.videoWidth || video.clientWidth || 640;
+            canvas.height = video.videoHeight || video.clientHeight || 360;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            return canvas.toDataURL("image/jpeg", 0.75);
+        } catch (e) {
+            console.warn("[QT] Screenshot capture failed:", e);
+            return null;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Gemini AI – Generate practical everyday sentence
+    // ═══════════════════════════════════════════════════════════════
+
+    async function geminiGenerateSentence(word, translated, srcLang, tgtLang) {
+        return new Promise((resolve, reject) => {
+            if (!chrome?.storage?.sync) {
+                reject(new Error("Brak klucza Gemini API"));
+                return;
+            }
+            chrome.storage.sync.get({ geminiApiKey: "" }, async (data) => {
+                const key = data.geminiApiKey;
+                if (!key) {
+                    reject(
+                        new Error(
+                            "Wpisz klucz Gemini API w ustawieniach rozszerzenia",
+                        ),
+                    );
+                    return;
+                }
+                try {
+                    const prompt = `You are a language learning assistant. The user is learning the word "${word}" (${srcLang}) which translates to "${translated}" (${tgtLang}).
+
+Generate ONE short, practical, everyday sentence using the word "${word}" in ${srcLang}. The sentence should:
+- Be useful in daily conversation
+- Be natural and commonly used
+- Be 5-15 words long
+- Show the word in a clear, memorable context
+
+Then translate that sentence to ${tgtLang}.
+
+Respond ONLY in this exact JSON format, nothing else:
+{"sentence": "...", "translation": "..."}`;
+
+                    const res = await fetch(
+                        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${encodeURIComponent(key)}`,
+                        {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: prompt }] }],
+                                generationConfig: {
+                                    temperature: 0.8,
+                                    maxOutputTokens: 200,
+                                },
+                            }),
+                        },
+                    );
+                    if (!res.ok) {
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(
+                            errData?.error?.message ||
+                                `Gemini HTTP ${res.status}`,
+                        );
+                    }
+                    const json = await res.json();
+                    const text =
+                        json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                    // Extract JSON from response (may have markdown code fence)
+                    const jsonMatch = text.match(/\{[\s\S]*\}/);
+                    if (!jsonMatch)
+                        throw new Error("Gemini: brak odpowiedzi JSON");
+                    const parsed = JSON.parse(jsonMatch[0]);
+                    resolve({
+                        sentence: parsed.sentence || "",
+                        translation: parsed.translation || "",
+                    });
+                } catch (err) {
+                    reject(err);
+                }
+            });
         });
     }
 
@@ -561,26 +664,12 @@
                 </div>`;
         }
 
-        // Save-sentence button (only if we have a sentence)
-        const saveSentenceBtn = cleanFullLine
-            ? `<button class="${P}save-sentence-btn"
-                    data-src="${escapeAttr(original)}" data-translated="${escapeAttr(translated)}"
-                    data-src-lang="${escapeAttr(srcLang)}" data-tgt-lang="${escapeAttr(targetLang)}"
-                    data-sentence="${escapeAttr(cleanFullLine)}"
-                    data-sentence-translated="${escapeAttr(cleanFullTranslated)}"
-                    title="Zapisz zdanie">${SVG.SAVE_SENTENCE}</button>`
-            : "";
+        // Common data attributes for all save buttons
+        const dataAttrs = `data-src="${escapeAttr(original)}" data-translated="${escapeAttr(translated)}" data-src-lang="${escapeAttr(srcLang)}" data-tgt-lang="${escapeAttr(targetLang)}" data-sentence="${escapeAttr(cleanFullLine)}" data-sentence-translated="${escapeAttr(cleanFullTranslated)}"`;
 
         return `
             <div class="${P}header">
                 <span>${langTag(srcLang)} → ${langTag(targetLang)}</span>
-                <div style="display:flex;align-items:center;">
-                    <button class="${P}save-btn"
-                        data-src="${escapeAttr(original)}" data-translated="${escapeAttr(translated)}"
-                        data-src-lang="${escapeAttr(srcLang)}" data-tgt-lang="${escapeAttr(targetLang)}"
-                        title="Zapisz słowo">${SVG.SAVE}</button>
-                    ${saveSentenceBtn}
-                </div>
             </div>
             <div class="${P}body">
                 <div class="${P}row">
@@ -594,6 +683,18 @@
                     <button class="${P}speak" data-text="${escapeAttr(translated)}" data-lang="${escapeAttr(targetLang)}" title="Odczytaj tłumaczenie">${SVG.SPEAKER}</button>
                 </div>
                 ${fullLineHtml}
+            </div>
+            <div class="${P}ai-result" id="${P}ai-result" style="display:none;"></div>
+            <div class="${P}save-footer">
+                <button class="${P}save-word-btn ${P}save-footer-btn" ${dataAttrs} title="Zapisz samo słowo">
+                    ${SVG.SAVE} <span>Słowo</span>
+                </button>
+                <button class="${P}save-sentence-footer-btn ${P}save-footer-btn" ${dataAttrs} title="Zapisz z aktualnym zdaniem" ${!cleanFullLine ? 'disabled style="opacity:0.35;cursor:default;"' : ""}>
+                    ${SVG.SAVE_SENTENCE} <span>Zdanie</span>
+                </button>
+                <button class="${P}save-ai-btn ${P}save-footer-btn" ${dataAttrs} title="Zapisz z mądrym zdaniem AI (Gemini)">
+                    ${SVG.SAVE_AI} <span>AI</span>
+                </button>
             </div>`;
     }
 
@@ -623,48 +724,118 @@
             });
         });
 
-        // Save word button
-        const saveBtn = tooltipEl.querySelector(`.${PREFIX}save-btn`);
-        if (saveBtn) {
-            saveBtn.addEventListener("click", (ev) => {
+        /** Helper: build base save entry from a button's data attributes */
+        function buildSaveEntry(btn) {
+            const screenshot = captureVideoScreenshot();
+            return {
+                original: btn.dataset.src,
+                translated: btn.dataset.translated,
+                srcLang: btn.dataset.srcLang,
+                tgtLang: btn.dataset.tgtLang,
+                sentence: "",
+                sentenceTranslated: "",
+                aiSentence: "",
+                aiSentenceTranslated: "",
+                screenshot: screenshot || "",
+                url: window.location.href,
+                timestamp: Date.now(),
+                downloaded: false,
+            };
+        }
+
+        // Save word only (no sentence)
+        const saveWordBtn = tooltipEl.querySelector(`.${PREFIX}save-word-btn`);
+        if (saveWordBtn) {
+            saveWordBtn.addEventListener("click", (ev) => {
                 ev.stopPropagation();
-                saveWord({
-                    original: saveBtn.dataset.src,
-                    translated: saveBtn.dataset.translated,
-                    srcLang: saveBtn.dataset.srcLang,
-                    tgtLang: saveBtn.dataset.tgtLang,
-                    sentence: "",
-                    sentenceTranslated: "",
-                    url: window.location.href,
-                    timestamp: Date.now(),
-                    downloaded: false,
-                });
-                saveBtn.innerHTML = SVG.SAVE_CHECK;
-                saveBtn.classList.add("saved");
+                saveWord(buildSaveEntry(saveWordBtn));
+                saveWordBtn.innerHTML =
+                    SVG.SAVE_CHECK + " <span>Zapisano!</span>";
+                saveWordBtn.classList.add("saved");
             });
         }
 
-        // Save sentence button
+        // Save with current sentence
         const saveSentenceBtn = tooltipEl.querySelector(
-            `.${PREFIX}save-sentence-btn`,
+            `.${PREFIX}save-sentence-footer-btn`,
         );
-        if (saveSentenceBtn) {
+        if (saveSentenceBtn && !saveSentenceBtn.disabled) {
             saveSentenceBtn.addEventListener("click", (ev) => {
                 ev.stopPropagation();
-                saveWord({
-                    original: saveSentenceBtn.dataset.src,
-                    translated: saveSentenceBtn.dataset.translated,
-                    srcLang: saveSentenceBtn.dataset.srcLang,
-                    tgtLang: saveSentenceBtn.dataset.tgtLang,
-                    sentence: saveSentenceBtn.dataset.sentence || "",
-                    sentenceTranslated:
-                        saveSentenceBtn.dataset.sentenceTranslated || "",
-                    url: window.location.href,
-                    timestamp: Date.now(),
-                    downloaded: false,
-                });
-                saveSentenceBtn.innerHTML = SVG.SAVE_SENTENCE_CHECK;
+                const entry = buildSaveEntry(saveSentenceBtn);
+                entry.sentence = saveSentenceBtn.dataset.sentence || "";
+                entry.sentenceTranslated =
+                    saveSentenceBtn.dataset.sentenceTranslated || "";
+                saveWord(entry);
+                saveSentenceBtn.innerHTML =
+                    SVG.SAVE_SENTENCE_CHECK + " <span>Zapisano!</span>";
                 saveSentenceBtn.classList.add("saved");
+            });
+        }
+
+        // Save with AI-generated sentence (Gemini)
+        const saveAiBtn = tooltipEl.querySelector(`.${PREFIX}save-ai-btn`);
+        if (saveAiBtn) {
+            saveAiBtn.addEventListener("click", async (ev) => {
+                ev.stopPropagation();
+                if (
+                    saveAiBtn.classList.contains("saved") ||
+                    saveAiBtn.classList.contains("loading")
+                )
+                    return;
+
+                saveAiBtn.classList.add("loading");
+                saveAiBtn.innerHTML = `<span class="${PREFIX}spinner-small"></span> <span>Generuję…</span>`;
+
+                const aiResultEl = tooltipEl.querySelector(
+                    `#${PREFIX}ai-result`,
+                );
+
+                try {
+                    const result = await geminiGenerateSentence(
+                        saveAiBtn.dataset.src,
+                        saveAiBtn.dataset.translated,
+                        saveAiBtn.dataset.srcLang,
+                        saveAiBtn.dataset.tgtLang,
+                    );
+
+                    // Show AI sentence in tooltip
+                    if (aiResultEl) {
+                        aiResultEl.style.display = "block";
+                        aiResultEl.innerHTML = `
+                            <div class="${PREFIX}ai-label">✨ AI zdanie:</div>
+                            <div class="${PREFIX}ai-text">${escapeHtml(result.sentence)}</div>
+                            <div class="${PREFIX}ai-translation">${escapeHtml(result.translation)}</div>`;
+                    }
+
+                    const entry = buildSaveEntry(saveAiBtn);
+                    entry.aiSentence = result.sentence;
+                    entry.aiSentenceTranslated = result.translation;
+                    // Also use AI sentence as the main sentence for Anki cloze
+                    entry.sentence = result.sentence;
+                    entry.sentenceTranslated = result.translation;
+                    saveWord(entry);
+
+                    saveAiBtn.innerHTML =
+                        SVG.SAVE_AI_CHECK + " <span>Zapisano!</span>";
+                    saveAiBtn.classList.remove("loading");
+                    saveAiBtn.classList.add("saved");
+                } catch (err) {
+                    console.error("[QT] Gemini AI error:", err);
+                    saveAiBtn.classList.remove("loading");
+                    saveAiBtn.innerHTML =
+                        SVG.SAVE_AI +
+                        ` <span style="color:#f87171;">Błąd</span>`;
+
+                    if (aiResultEl) {
+                        aiResultEl.style.display = "block";
+                        aiResultEl.innerHTML = `<div style="color:#f87171;font-size:11px;padding:6px 12px;">⚠ ${escapeHtml(err.message)}</div>`;
+                    }
+
+                    setTimeout(() => {
+                        saveAiBtn.innerHTML = SVG.SAVE_AI + " <span>AI</span>";
+                    }, 3000);
+                }
             });
         }
     }
@@ -841,6 +1012,7 @@
 
     const SUB_STYLE_ID = PREFIX + "sub-style";
     const SUB_STYLE_DEFAULTS = {
+        subStyleEnabled: true,
         subFontFamily: "",
         subFontWeight: "",
         subFontSize: "",
@@ -862,14 +1034,23 @@
             document.head.appendChild(styleEl);
         }
 
+        // If disabled, clear all custom styles
+        if (data.subStyleEnabled === false) {
+            styleEl.textContent = "";
+            return;
+        }
+
         const rules = [];
 
         // Non-Reels word selectors (YT segments, NF words, LM words)
+        // Include raw selectors (before processing) so styles apply instantly
         const selectors = [
+            `.ytp-caption-window-container .ytp-caption-segment`,
             `.ytp-caption-segment.${PREFIX}clickable`,
             `.${PREFIX}yt-word`,
             `.${PREFIX}nf-word`,
             `.${PREFIX}lm-word`,
+            `.player-timedtext-text-container span`,
             `.player-timedtext-text-container span.${PREFIX}clickable`,
             `.vjs-text-track-cue div`,
         ];
@@ -910,10 +1091,10 @@
 
             // Apply background to caption segments / containers
             rules.push(
-                `.ytp-caption-segment.${PREFIX}clickable { background-color: ${bgVal} !important; border-radius: 4px; padding: 2px 6px !important; }`,
+                `.ytp-caption-window-container .ytp-caption-segment { background-color: ${bgVal} !important; border-radius: 4px; padding: 2px 6px !important; }`,
             );
             rules.push(
-                `.player-timedtext-text-container span.${PREFIX}clickable { background-color: ${bgVal} !important; border-radius: 4px; padding: 2px 6px !important; }`,
+                `.player-timedtext-text-container span { background-color: ${bgVal} !important; border-radius: 4px; padding: 2px 6px !important; }`,
             );
             rules.push(
                 `.vjs-text-track-cue { background-color: ${bgVal} !important; border-radius: 4px; padding: 2px 6px !important; }`,
@@ -944,6 +1125,15 @@
             if (subKeys.some((k) => k in changes)) {
                 loadAndApplySubtitleStyles();
             }
+        });
+    }
+
+    /** Toggle subtitle styles on/off and persist the choice. */
+    function toggleSubtitleStyles() {
+        if (!chrome?.storage?.sync) return;
+        chrome.storage.sync.get({ subStyleEnabled: true }, (data) => {
+            const next = !data.subStyleEnabled;
+            chrome.storage.sync.set({ subStyleEnabled: next });
         });
     }
 
@@ -991,6 +1181,10 @@
         getTargetLang,
         saveWord,
 
+        // AI & Screenshot
+        geminiGenerateSentence,
+        captureVideoScreenshot,
+
         // Tooltip
         buildTooltipHtml,
         attachTooltipHandlers,
@@ -1010,5 +1204,8 @@
         getVideo,
         pauseVideo,
         resumeVideo,
+
+        // Subtitle styles
+        toggleSubtitleStyles,
     };
 })();
