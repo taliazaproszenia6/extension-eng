@@ -510,9 +510,13 @@
             const video = document.querySelector("video");
             if (!video || video.readyState < 2) return null;
 
+            const vw = video.videoWidth || video.clientWidth || 640;
+            const vh = video.videoHeight || video.clientHeight || 360;
+            const MAX = 200;
+            const scale = Math.min(MAX / vw, MAX / vh, 1);
             const canvas = document.createElement("canvas");
-            canvas.width = video.videoWidth || video.clientWidth || 640;
-            canvas.height = video.videoHeight || video.clientHeight || 360;
+            canvas.width = Math.round(vw * scale);
+            canvas.height = Math.round(vh * scale);
             const ctx = canvas.getContext("2d");
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             return canvas.toDataURL("image/jpeg", 0.75);
