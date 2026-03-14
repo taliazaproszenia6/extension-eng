@@ -45,7 +45,7 @@
     let clickWasPlaying = false;
 
     // ── Reels / Karaoke Caption Mode ───────────────────────────────
-    let reelsMode = true; // ON by default
+    let reelsMode = false; // OFF by default (normal subtitles)
     let reelsContainer = null; // wrapper
     let reelsBigWord = null; // the single current word element
     let reelsPrevText = "";
@@ -658,7 +658,7 @@
     function init() {
         observeSubtitles();
         // Start Reels mode by default
-        setReelsMode(true);
+        setReelsMode(false);
     }
 
     if (document.readyState === "loading") {
